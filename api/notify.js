@@ -200,3 +200,7 @@ async function getFCMAccessToken(sa) {
   if (!tokenData.access_token) throw new Error("FCM token falhou: " + JSON.stringify(tokenData));
   return tokenData.access_token;
 }
+
+
+
+
