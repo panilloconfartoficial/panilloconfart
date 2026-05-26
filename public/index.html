@@ -1227,6 +1227,10 @@ img { max-width: 100%; display: block; }
         <span></span><span></span><span></span>
       </button>
 <!-- Admin access via /admin -->
+      <button class="admin-link-btn" id="nav-client-btn" onclick="openClientRegister()" style="display:flex;align-items:center;gap:6px;">
+        <i class="ti ti-user" style="font-size:14px;"></i>
+        <span class="admin-btn-text" id="nav-client-label">Cadastre-se</span>
+      </button>
       <button class="cart-btn" onclick="toggleCart()">
         <i class="ti ti-shopping-bag"></i>
         <span class="cart-btn-text">Carrinho</span>
@@ -1255,6 +1259,9 @@ img { max-width: 100%; display: block; }
     </div>
     <div onclick="toggleCart();toggleStoreMobileMenu();" style="padding:14px 24px; color:rgba(255,255,255,0.8); font-size:15px; cursor:pointer; display:flex; align-items:center; gap:12px;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
       <i class="ti ti-shopping-bag" style="font-size:18px;color:var(--gold-light);"></i> Carrinho
+    </div>
+    <div onclick="openClientRegister();toggleStoreMobileMenu();" style="padding:14px 24px; color:rgba(255,255,255,0.8); font-size:15px; cursor:pointer; display:flex; align-items:center; gap:12px;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+      <i class="ti ti-user" style="font-size:18px;color:var(--gold-light);"></i> <span id="mob-client-label">Cadastre-se</span>
     </div>
 <div style="flex:1;"></div>
   </div>
@@ -2260,6 +2267,81 @@ img { max-width: 100%; display: block; }
 </div><!-- /page-admin -->
 
 <!-- ═══════════════════════════════════════════════════
+     MODAL CADASTRO DO CLIENTE
+════════════════════════════════════════════════════ -->
+<div class="client-reg-overlay" id="client-reg-modal">
+  <div class="client-reg-box">
+
+    <!-- Estado: formulário -->
+    <div id="crb-form-state">
+      <div class="crb-header">
+        <div>
+          <div class="crb-title">Cadastre-se</div>
+          <div class="crb-sub">Salve seus dados e facilite seus pedidos futuros</div>
+        </div>
+        <button class="modal-close" onclick="closeClientRegister()" style="background:rgba(255,255,255,0.1);color:#fff;">
+          <i class="ti ti-x"></i>
+        </button>
+      </div>
+      <div class="crb-body">
+        <div class="crb-avatar-row">
+          <div class="crb-avatar">🍪</div>
+        </div>
+        <div class="f2" style="margin-bottom:12px;">
+          <div class="fg">
+            <label class="fl">Nome completo <span class="req">*</span></label>
+            <input class="fi" id="crb-nome" type="text" placeholder="Seu nome completo">
+          </div>
+          <div class="fg">
+            <label class="fl">WhatsApp <span class="req">*</span></label>
+            <input class="fi" id="crb-wpp" type="tel" placeholder="(85) 99999-9999">
+          </div>
+        </div>
+        <div class="f2" style="margin-bottom:12px;">
+          <div class="fg">
+            <label class="fl">E-mail</label>
+            <input class="fi" id="crb-email" type="email" placeholder="seu@email.com">
+          </div>
+          <div class="fg">
+            <label class="fl">Data de nascimento</label>
+            <input class="fi" id="crb-bday" type="date">
+          </div>
+        </div>
+        <div class="fg" style="margin-bottom:0;">
+          <label class="fl">Alergia ou observação</label>
+          <input class="fi" id="crb-obs" type="text" placeholder="Ex: sem nozes, sem glúten...">
+        </div>
+        <div id="crb-error" style="display:none;margin-top:12px;background:#FAECE7;border-radius:8px;padding:10px 14px;font-size:12px;color:#993C1D;"></div>
+      </div>
+      <div class="crb-footer">
+        <button class="btn-back" onclick="closeClientRegister()">Cancelar</button>
+        <button class="btn-sm-primary" id="crb-submit-btn" onclick="submitClientRegister()" style="padding:10px 24px;">
+          Salvar cadastro
+        </button>
+      </div>
+    </div>
+
+    <!-- Estado: sucesso -->
+    <div id="crb-success-state" style="display:none;">
+      <div class="crb-success">
+        <div class="crb-success-icon">🎉</div>
+        <div class="crb-success-title" id="crb-success-name">Bem-vinda!</div>
+        <div class="crb-success-sub">
+          Seu cadastro foi salvo com sucesso.<br>
+          Agora seus dados aparecem automaticamente ao fazer pedidos!
+        </div>
+        <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px;">
+          <button class="btn-sm-primary" style="padding:12px;width:100%;" onclick="closeClientRegister()">
+            Explorar cardápio →
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
      FIADO AUTH MODAL
 ════════════════════════════════════════════════════ -->
 <div class="prod-modal-overlay" id="fiado-auth-modal">
@@ -2669,6 +2751,129 @@ function updateCartUI() {
     const msg = encodeURIComponent(`Olá Panillo! Quero fazer um pedido (${tipoPed}):\n` + items.map(i=>`• ${i.qty}x ${i.prod.nome} = R$ ${(i.prod.preco*i.qty).toFixed(2)}`).join("\n") + `\n*Total: R$ ${total.toFixed(2)}*`);
     document.getElementById("wpp-btn").onclick = () => window.open(`https://wa.me/${WPP_NUMBER}?text=${msg}`,"_blank");
   }
+}
+
+// ─── CADASTRO DO CLIENTE ────────────────────────────────
+function openClientRegister() {
+  // Se já tem dados salvos localmente, abre em modo "editar perfil"
+  const saved = JSON.parse(localStorage.getItem("panillo-cliente") || "{}");
+  const isEdit = !!saved.nome;
+
+  // Reset states
+  document.getElementById("crb-form-state").style.display   = "";
+  document.getElementById("crb-success-state").style.display = "none";
+  document.getElementById("crb-error").style.display = "none";
+
+  // Preenche campos se já cadastrado
+  document.getElementById("crb-nome").value  = saved.nome  || "";
+  document.getElementById("crb-wpp").value   = saved.wpp   || "";
+  document.getElementById("crb-email").value = saved.email || "";
+  document.getElementById("crb-bday").value  = saved.bday  || "";
+  document.getElementById("crb-obs").value   = saved.obs   || "";
+
+  // Ajusta textos para modo editar
+  const submitBtn = document.getElementById("crb-submit-btn");
+  if (isEdit) {
+    submitBtn.textContent = "Atualizar cadastro";
+  } else {
+    submitBtn.textContent = "Salvar cadastro";
+  }
+
+  document.getElementById("client-reg-modal").classList.add("open");
+}
+
+function closeClientRegister() {
+  document.getElementById("client-reg-modal").classList.remove("open");
+}
+
+async function submitClientRegister() {
+  const nome  = document.getElementById("crb-nome").value.trim();
+  const wpp   = document.getElementById("crb-wpp").value.trim();
+  const email = document.getElementById("crb-email").value.trim();
+  const bday  = document.getElementById("crb-bday").value;
+  const obs   = document.getElementById("crb-obs").value.trim();
+  const errEl = document.getElementById("crb-error");
+  const btn   = document.getElementById("crb-submit-btn");
+
+  errEl.style.display = "none";
+  if (!nome || !wpp) {
+    errEl.textContent = "Nome e WhatsApp são obrigatórios.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  btn.textContent = "Salvando...";
+  btn.disabled = true;
+
+  const clientData = { nome, wpp, email, bday, obs };
+
+  // Salva localmente
+  localStorage.setItem("panillo-cliente", JSON.stringify(clientData));
+
+  // Salva / atualiza no Firebase
+  try {
+    if (db && FB) {
+      const existing = await FB.getDocs(
+        FB.query(FB.collection(db, "clients"), FB.where("wpp", "==", wpp))
+      );
+      if (existing.empty) {
+        await FB.addDoc(FB.collection(db, "clients"), {
+          ...clientData,
+          pedidos: 0,
+          totalGasto: 0,
+          favorito: "",
+          createdAt: FB.serverTimestamp()
+        });
+      } else {
+        await FB.updateDoc(existing.docs[0].ref, {
+          nome,
+          ...(email ? { email } : {}),
+          ...(bday  ? { bday  } : {}),
+          ...(obs   ? { obs   } : {})
+        });
+      }
+    }
+  } catch(e) {
+    console.warn("Firebase client save:", e);
+  }
+
+  btn.textContent = "Salvar cadastro";
+  btn.disabled = false;
+
+  // Mostra sucesso
+  document.getElementById("crb-form-state").style.display    = "none";
+  document.getElementById("crb-success-state").style.display = "";
+  document.getElementById("crb-success-name").textContent =
+    `Olá, ${nome.split(" ")[0]}! 🎉`;
+
+  // Atualiza botão da nav
+  updateNavClientButton(nome);
+
+  // Verifica se tem fiado ativo e mostra opção
+  checkFiadoForClient(wpp);
+}
+
+function updateNavClientButton(nome) {
+  const initials = nome.substring(0, 2).toUpperCase();
+  const label    = nome.split(" ")[0];
+  const navBtn   = document.getElementById("nav-client-label");
+  const mobLabel = document.getElementById("mob-client-label");
+  if (navBtn) navBtn.textContent = label;
+  if (mobLabel) mobLabel.textContent = label;
+}
+
+async function checkFiadoForClient(wpp) {
+  try {
+    if (!db || !FB) return;
+    // Recarrega contas fiado para atualizar opção de pagamento no checkout
+    await loadFiadoAccounts();
+  } catch {}
+}
+
+// Ao carregar a página, restaura o nome no botão se já cadastrado
+function restoreClientSession() {
+  const saved = JSON.parse(localStorage.getItem("panillo-cliente") || "{}");
+  if (saved.nome) updateNavClientButton(saved.nome);
 }
 
 function toggleCart() {
@@ -4137,6 +4342,7 @@ function toggleAdminSidebar() {
 // Fecha sidebar ao clicar em um item (mobile)
 // ─── INIT ──────────────────────────────────────────────
 updateCartUI();
+restoreClientSession();
 document.addEventListener("DOMContentLoaded", () => {
   // Sidebar mobile: fecha ao clicar em item
   document.querySelectorAll(".sb-item").forEach(item => {
@@ -4343,6 +4549,52 @@ document.addEventListener("DOMContentLoaded", () => {
 ═══════════════════════════════════════════════════════ */
 #fiado-auth-modal.open { display: flex; }
 
+/* ═══════════════════════════════════════════════════════
+   MODAL DE CADASTRO DO CLIENTE
+═══════════════════════════════════════════════════════ */
+.client-reg-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 300; display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.client-reg-overlay.open { display: flex; }
+.client-reg-box {
+  background: var(--white); border-radius: 20px;
+  width: 100%; max-width: 440px; overflow: hidden;
+  animation: fadeIn .25s ease; box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+}
+.crb-header {
+  background: var(--teal-dark); padding: 22px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.crb-title {
+  font-family: var(--font-display); font-size: 22px;
+  font-weight: 600; color: #fff;
+}
+.crb-sub { color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 2px; }
+.crb-body { padding: 22px 24px; }
+.crb-avatar-row {
+  display: flex; justify-content: center; margin-bottom: 20px;
+}
+.crb-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: var(--gold-pale); border: 2px solid rgba(200,144,42,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.crb-footer {
+  padding: 16px 24px; border-top: 0.5px solid var(--border);
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+.crb-success {
+  text-align: center; padding: 32px 24px;
+}
+.crb-success-icon { font-size: 52px; margin-bottom: 12px; }
+.crb-success-title {
+  font-family: var(--font-display); font-size: 24px;
+  font-weight: 600; color: var(--teal-dark); margin-bottom: 6px;
+}
+.crb-success-sub { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
 /* ─── EXTRAS: urgency bar, dep cards, combo prod-img ─── */
 .urgency-bar {
   display: inline-flex; align-items: center; gap: 6px;
@@ -4368,6 +4620,3 @@ document.addEventListener("DOMContentLoaded", () => {
 </style>
 </body>
 </html>
-
-
-
