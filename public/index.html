@@ -1235,30 +1235,76 @@ img { max-width: 100%; display: block; }
       <h1 class="hero-title" style="color:var(--teal-dark);text-align:center;">Cookies &amp; Brownies<br><em style="color:var(--gold);">irresistíveis</em></h1>
       <p class="hero-sub" style="color:var(--muted);text-align:center;max-width:480px;">Cookies e brownies artesanais feitos sob encomenda. Cada mordida é uma experiência única — ingredientes selecionados, receitas exclusivas.</p>
       <div class="hero-btns" style="justify-content:center;">
-        <button class="btn-hero-primary" onclick="document.getElementById('sec-produtos').scrollIntoView({behavior:'smooth'})">Ver cardápio</button>
-        <button class="btn-hero-outline" style="border-color:#C8C2B4;color:var(--teal-dark);" onclick="document.getElementById('sec-como').scrollIntoView({behavior:'smooth'})">Como funciona</button>
+        <button class="btn-hero-primary" onclick="switchOrderMode('pe');document.getElementById('sec-order-hero').scrollIntoView({behavior:'smooth'})">
+          <i class="ti ti-package" style="font-size:14px;margin-right:4px;"></i>Pronta Entrega
+        </button>
+        <button class="btn-hero-outline" style="border-color:#C8C2B4;color:var(--teal-dark);" onclick="switchOrderMode('enc');document.getElementById('sec-order-hero').scrollIntoView({behavior:'smooth'})">
+          <i class="ti ti-calendar" style="font-size:14px;margin-right:4px;"></i>Encomenda
+        </button>
       </div>
     </div>
 
   </section>
 
-  <!-- PRODUTOS -->
-  <section id="sec-produtos" class="section">
-    <div class="section-header">
-      <div>
-        <div class="section-title">Nosso Cardápio</div>
-        <div class="section-subtitle">Receitas exclusivas, feitas com ingredientes selecionados</div>
+  <!-- PRODUTOS — tabs PE / ENCOMENDA -->
+  <div class="order-mode-hero" id="sec-order-hero">
+    <div class="order-mode-tag"><i class="ti ti-sparkles" style="font-size:10px;"></i> artesanal · fortaleza</div>
+    <div class="order-mode-title">Faça seu <em>Pedido</em></div>
+    <div class="order-mode-sub">Escolha entre pronta entrega ou encomenda personalizada</div>
+    <div class="order-tabs-row">
+      <button class="order-tab-btn active" id="otab-pe" onclick="switchOrderMode('pe')">
+        <i class="ti ti-package" style="font-size:16px;"></i> Pronta Entrega
+      </button>
+      <button class="order-tab-btn" id="otab-enc" onclick="switchOrderMode('enc')">
+        <i class="ti ti-calendar" style="font-size:16px;"></i> Encomenda
+      </button>
+    </div>
+  </div>
+
+  <section id="sec-produtos" class="section" style="padding-top:28px;">
+
+    <!-- TAB: PRONTA ENTREGA -->
+    <div class="order-tab-content active" id="tab-pe-content">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div class="section-title" style="font-size:24px;">🛒 Pronta Entrega</div>
+          <div class="section-subtitle">Produtos disponíveis agora, estoque em tempo real</div>
+        </div>
+      </div>
+      <div class="pe-stock-info">
+        <i class="ti ti-info-circle" style="font-size:16px;"></i>
+        Estoque atualizado automaticamente. Quando chegar a zero o produto é removido desta aba.
+      </div>
+      <div class="products-grid" id="products-grid-pe">
+        <!-- Renderizado via JS -->
       </div>
     </div>
-    <div class="filter-row">
-      <button class="filter-pill active" onclick="filterProducts('todos',this)">Todos</button>
-      <button class="filter-pill" onclick="filterProducts('cookie',this)">Cookies</button>
-      <button class="filter-pill" onclick="filterProducts('brownie',this)">Brownies</button>
-      <button class="filter-pill" onclick="filterProducts('combo',this)">🎁 Combos</button>
-    </div>
-    <div class="products-grid" id="products-grid">
-      <!-- Renderizado via JS -->
-    </div>
+
+    <!-- TAB: ENCOMENDA -->
+    <div class="order-tab-content" id="tab-enc-content">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div class="section-title" style="font-size:24px;">📅 Encomenda</div>
+          <div class="section-subtitle">Cardápio completo com prazo mínimo de 48 horas</div>
+        </div>
+      </div>
+      <div class="enc-notice">
+        <i class="ti ti-clock" style="font-size:20px;color:var(--gold);flex-shrink:0;margin-top:1px;"></i>
+        <div>
+          <strong>Prazo mínimo: 48 horas de antecedência</strong>
+          Seu pedido será preparado com carinho após a confirmação. Combinamos a data de retirada no WhatsApp.
+        </div>
+      </div>
+      <div class="filter-row">
+        <button class="filter-pill active" onclick="filterProducts('todos',this)">Todos</button>
+        <button class="filter-pill" onclick="filterProducts('cookie',this)">Cookies</button>
+        <button class="filter-pill" onclick="filterProducts('brownie',this)">Brownies</button>
+        <button class="filter-pill" onclick="filterProducts('combo',this)">🎁 Combos</button>
+      </div>
+      <div class="products-grid" id="products-grid">
+        <!-- Renderizado via JS -->
+      </div><!-- /products-grid enc -->
+    </div><!-- /tab-enc-content -->
   </section>
 
   <!-- DEPOIMENTOS -->
@@ -1357,7 +1403,7 @@ img { max-width: 100%; display: block; }
         <span class="cart-total-val" id="cart-total">R$ 0,00</span>
       </div>
     </div>
-    <button class="btn-checkout" onclick="openCheckout()">Finalizar encomenda →</button>
+    <button class="btn-checkout" onclick="openCheckout()" id="checkout-main-btn">Finalizar pedido →</button>
     <button class="btn-wpp" id="wpp-btn">
       <i class="ti ti-brand-whatsapp" style="font-size:16px;"></i>
       Pedir pelo WhatsApp
@@ -1371,7 +1417,7 @@ img { max-width: 100%; display: block; }
 <div class="modal-overlay" id="checkout-modal">
   <div class="modal-box">
     <div class="modal-header">
-      <div class="modal-title">Finalizar encomenda</div>
+      <div class="modal-title" id="checkout-modal-title">Finalizar pedido</div>
       <button class="modal-close" onclick="closeCheckout()"><i class="ti ti-x"></i></button>
     </div>
     <div class="step-bar" id="checkout-stepbar"></div>
@@ -1468,6 +1514,11 @@ img { max-width: 100%; display: block; }
                 <div class="pay-card-icon">💳</div>
                 <div class="pay-card-label">Débito</div>
                 <div class="pay-card-desc">Pague na retirada</div>
+              </div>
+              <div class="pay-card" id="pay-fiado-card" style="display:none;" onclick="selectPay('fiado',this)">
+                <div class="pay-card-icon">🤝</div>
+                <div class="pay-card-label">Fiado</div>
+                <div class="pay-card-desc">Acumula no seu saldo</div>
               </div>
             </div>
           </div>
@@ -1731,10 +1782,19 @@ img { max-width: 100%; display: block; }
       <i class="ti ti-cookie sb-icon"></i>
       <span class="sb-label">Cardápio</span>
     </div>
+    <div class="sb-item" onclick="showAdminSection('estoque',this)">
+      <i class="ti ti-package sb-icon"></i>
+      <span class="sb-label">Estoque PE</span>
+    </div>
     <div class="sb-section">Financeiro</div>
     <div class="sb-item" onclick="showAdminSection('suprimentos',this)">
       <i class="ti ti-report-money sb-icon"></i>
       <span class="sb-label">Suprimentos</span>
+    </div>
+    <div class="sb-item" onclick="showAdminSection('fiado',this)">
+      <i class="ti ti-credit-card sb-icon"></i>
+      <span class="sb-label">Contas Fiado</span>
+      <span class="sb-badge" id="badge-fiado">0</span>
     </div>
     <div class="sb-section">Ferramentas</div>
     <div class="sb-item" onclick="showAdminSection('marketing',this)">
@@ -1906,6 +1966,64 @@ img { max-width: 100%; display: block; }
       </div>
       <div class="admin-content">
         <div class="prod-admin-grid" id="admin-products-grid"></div>
+      </div>
+    </div>
+
+    <!-- ── ESTOQUE PRONTA ENTREGA ── -->
+    <div id="sec-estoque" class="hidden">
+      <div class="admin-topbar">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+          <div class="admin-page-title">Estoque Pronta Entrega</div>
+        </div>
+        <div class="topbar-right">
+          <button class="btn-sm-outline" onclick="loadStock()">↻ Atualizar</button>
+        </div>
+      </div>
+      <div class="admin-content">
+        <div class="admin-card" style="margin-bottom:16px;">
+          <div class="ac-title"><i class="ti ti-info-circle" style="color:var(--gold);"></i> Como funciona</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.6;">
+            Ative aqui os produtos disponíveis para <strong style="color:var(--teal-dark);">Pronta Entrega</strong> e defina a quantidade em estoque.
+            Conforme os pedidos forem chegando, o estoque diminui automaticamente.
+            Quando chegar a zero, o produto some da aba Pronta Entrega na loja.
+          </div>
+        </div>
+        <div class="stock-admin-grid" id="stock-admin-grid">
+          <div style="color:var(--muted);font-size:13px;padding:20px;">Carregando produtos...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CONTAS FIADO ── -->
+    <div id="sec-fiado" class="hidden">
+      <div class="admin-topbar">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+          <div class="admin-page-title">Contas Fiado</div>
+        </div>
+        <div class="topbar-right">
+          <button class="btn-sm-primary" onclick="openFiadoAuthModal()"><i class="ti ti-user-plus" style="font-size:13px;"></i> Autorizar cliente</button>
+        </div>
+      </div>
+      <div class="admin-content">
+        <div class="fiado-metrics" id="fiado-metrics">
+          <div class="fiado-metric">
+            <div class="fm-label">Clientes c/ fiado ativo</div>
+            <div class="fm-val" id="fm-count">0</div>
+          </div>
+          <div class="fiado-metric">
+            <div class="fm-label">Total em aberto</div>
+            <div class="fm-val danger" id="fm-total">R$ 0,00</div>
+          </div>
+          <div class="fiado-metric">
+            <div class="fm-label">Recebido este mês</div>
+            <div class="fm-val ok" id="fm-recebido">R$ 0,00</div>
+          </div>
+        </div>
+        <div class="fiado-client-list" id="fiado-client-list">
+          <div style="color:var(--muted);font-size:13px;padding:20px;">Nenhum cliente com fiado ativo.</div>
+        </div>
       </div>
     </div>
 
@@ -2100,6 +2218,52 @@ img { max-width: 100%; display: block; }
     </div>
 
 <!-- ═══════════════════════════════════════════════════
+     FIADO AUTH MODAL
+════════════════════════════════════════════════════ -->
+<div class="prod-modal-overlay" id="fiado-auth-modal">
+  <div class="prod-modal" style="max-width:480px;">
+    <div class="pm-header">
+      <div class="pm-title">Autorizar Fiado para Cliente</div>
+      <button class="modal-close" onclick="closeFiadoAuthModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="pm-body">
+      <div style="background:var(--gold-pale);border:1px solid rgba(200,144,42,0.25);border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:13px;color:var(--brown);">
+        <strong style="display:block;margin-bottom:4px;">🤝 Conta fiado</strong>
+        Ao autorizar um cliente para fiado, ele poderá fazer pedidos e acumular saldo a pagar. O valor será debitado do saldo quando você registrar o pagamento.
+      </div>
+      <div class="fg" style="margin-bottom:12px;">
+        <label class="fl">Buscar cliente pelo WhatsApp <span class="req">*</span></label>
+        <div style="display:flex;gap:8px;">
+          <input class="fi" id="fiado-search-wpp" type="tel" placeholder="(85) 99999-9999" style="flex:1;">
+          <button class="btn-sm-primary" onclick="searchClientForFiado()" style="white-space:nowrap;">Buscar</button>
+        </div>
+      </div>
+      <div id="fiado-client-found" style="display:none;">
+        <div style="background:var(--cream);border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px solid var(--border);">
+          <div style="font-size:13px;font-weight:500;color:var(--teal-dark);" id="fiado-found-name">—</div>
+          <div style="font-size:11px;color:var(--muted);" id="fiado-found-wpp">—</div>
+        </div>
+        <div class="fg" style="margin-bottom:12px;">
+          <label class="fl">Limite de crédito (R$) — opcional</label>
+          <input class="fi" id="fiado-limite" type="number" step="0.01" placeholder="Ex: 200 (deixe vazio para sem limite)">
+        </div>
+        <div class="fg">
+          <label class="fl">Observação interna</label>
+          <input class="fi" id="fiado-obs" type="text" placeholder="Ex: Cliente VIP, indicação...">
+        </div>
+      </div>
+      <div id="fiado-no-client" style="display:none;background:#FAECE7;border-radius:8px;padding:10px 14px;font-size:12px;color:#993C1D;">
+        Cliente não encontrado. Certifique-se que o número está correto e que ele já fez um pedido.
+      </div>
+    </div>
+    <div class="pm-footer">
+      <button class="btn-back" onclick="closeFiadoAuthModal()">Cancelar</button>
+      <button class="btn-sm-primary" id="fiado-confirm-btn" onclick="confirmFiadoAuth()" style="display:none;">Autorizar fiado</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
      JAVASCRIPT
 ════════════════════════════════════════════════════ -->
 <script>
@@ -2122,6 +2286,10 @@ let allIngredients = [];
 let allProducts = [];
 let orderFilterStatus = "todos";
 let iaChatHistory = [];
+let orderMode = "pe";          // "pe" | "enc"
+let allStock = {};             // { prodId: { qty, ativo } }
+let allFiadoAccounts = [];     // array of credit account docs
+let foundFiadoClient = null;   // temp for fiado auth modal
 
 // ─── FIREBASE HELPERS ──────────────────────────────────
 let db, auth, FB;
@@ -2150,6 +2318,8 @@ window.addEventListener("firebase-ready", () => {
   loadIngredients();
   loadOrders();
   loadDashboard();
+  loadStock();
+  loadFiadoAccounts();
 });
 
 async function fbAdd(col, data) {
@@ -2219,6 +2389,8 @@ function showAdminSection(sec, el) {
   if (sec === "pedidos")     renderOrders();
   if (sec === "clientes")    renderClients();
   if (sec === "cardapio")    renderAdminProducts();
+  if (sec === "estoque")     renderStockAdmin();
+  if (sec === "fiado")       renderFiadoAdmin();
   if (sec === "suprimentos") renderIngredients();
   if (sec === "ia")          renderIASection();
 }
@@ -2227,12 +2399,94 @@ function showAdminSection(sec, el) {
 async function loadProducts() {
   try {
     const docs = await fbGet("products");
-    allProducts = docs; // sem produtos padrão — só o que você cadastrar
+    allProducts = docs;
   } catch {
     allProducts = [];
   }
   renderStoreProducts("todos");
+  renderPEProducts();
   renderAdminProducts();
+}
+
+// ─── ORDER MODE (PE / Encomenda) ───────────────────────
+function switchOrderMode(mode) {
+  orderMode = mode;
+  document.getElementById("otab-pe").classList.toggle("active", mode === "pe");
+  document.getElementById("otab-enc").classList.toggle("active", mode === "enc");
+  document.getElementById("tab-pe-content").classList.toggle("active", mode === "pe");
+  document.getElementById("tab-enc-content").classList.toggle("active", mode === "enc");
+  if (mode === "pe") renderPEProducts();
+}
+
+function renderPEProducts() {
+  const grid = document.getElementById("products-grid-pe");
+  if (!grid) return;
+  const peProds = allProducts.filter(p => {
+    if (p.ativo === false) return false;
+    const s = allStock[p.id];
+    return s && s.ativo && (s.qty || 0) > 0;
+  });
+  if (peProds.length === 0) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:48px 20px;color:var(--muted);font-size:14px;">
+      <div style="font-size:40px;margin-bottom:12px;">📦</div>
+      Nenhum produto disponível para pronta entrega no momento.<br>
+      <span style="font-size:12px;">Veja nosso <a href="javascript:void(0)" onclick="switchOrderMode('enc')" style="color:var(--gold);">cardápio de encomendas</a>!</span>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = peProds.map(p => {
+    const s = allStock[p.id];
+    const qty = s ? (s.qty || 0) : 0;
+    const isLow = qty > 0 && qty <= 3;
+    const badgeClass = qty === 0 ? "stock-zero" : isLow ? "stock-low" : "stock-ok";
+    const badgeIcon  = qty === 0 ? "ti-x" : isLow ? "ti-alert-triangle" : "ti-circle-check";
+    const badgeText  = qty === 0 ? "Esgotado" : `${qty} unid.`;
+    const imgBg = p.categoria === "brownie"
+      ? "background:linear-gradient(135deg,#F5E8DA,#E8D0B8);"
+      : p.categoria === "combo"
+        ? "background:linear-gradient(135deg,#FDF6E8,#F5E0B0);"
+        : "background:linear-gradient(135deg,#FDF0DC,#F5E0B0);";
+    const cardOp = qty === 0 ? "opacity:0.55;" : "";
+    return `<div class="product-card" style="${cardOp}" id="pe-card-${p.id}">
+      <div class="prod-img ${p.categoria}" style="${imgBg}">
+        <span style="font-size:72px;">${p.emoji || "🍪"}</span>
+      </div>
+      <div class="prod-body">
+        <div class="prod-name">${p.nome}</div>
+        <div class="prod-desc">${p.desc || ""}</div>
+        <div class="stock-badge-pe ${badgeClass}"><i class="ti ${badgeIcon}" style="font-size:11px;"></i> ${badgeText}</div>
+        <div class="prod-footer">
+          <div class="prod-price">R$ ${Number(p.preco).toFixed(2).replace(".",",")}<small>/un.</small></div>
+          ${qty > 0 ? `<div class="qty-ctrl">
+            <button class="qty-btn" onclick="changePEQty('${p.id}',-1)">−</button>
+            <span class="qty-num" id="pe-qty-${p.id}">0</span>
+            <button class="qty-btn" onclick="changePEQty('${p.id}',1)">+</button>
+          </div>` : `<button disabled style="background:rgba(0,0,0,0.06);color:#999;border:none;padding:8px 14px;border-radius:20px;font-size:12px;">Esgotado</button>`}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function changePEQty(prodId, delta) {
+  const s = allStock[prodId];
+  const maxQty = s ? (s.qty || 0) : 0;
+  const qtyEl = document.getElementById("pe-qty-" + prodId);
+  if (!qtyEl) return;
+  const prod = allProducts.find(p => p.id === prodId);
+  if (!prod) return;
+
+  const current = parseInt(qtyEl.textContent) || 0;
+  const newQty = Math.min(Math.max(0, current + delta), maxQty);
+  qtyEl.textContent = newQty;
+
+  const key = prodId + "_pe";
+  if (newQty === 0) {
+    delete cart[key];
+  } else {
+    cart[key] = { prod: { ...prod, _pe: true }, qty: newQty };
+  }
+  updateCartUI();
 }
 
 function renderStoreProducts(filter) {
@@ -2308,11 +2562,18 @@ function updateCartUI() {
   document.getElementById("cart-count").textContent = count;
   const listEl = document.getElementById("cart-items-list");
   const footerEl = document.getElementById("cart-footer-panel");
+  const isPE = items.some(i => i.prod._pe);
+
+  // Update checkout button label
+  const checkoutBtn = document.getElementById("checkout-main-btn");
+  if (checkoutBtn) checkoutBtn.textContent = isPE ? "Finalizar pedido →" : "Finalizar encomenda →";
+
   if (items.length === 0) {
     listEl.innerHTML = `<div class="cart-empty"><div class="cart-empty-icon">🛒</div><div>Seu carrinho está vazio</div></div>`;
     footerEl.style.display = "none";
   } else {
-    listEl.innerHTML = items.map(i => `
+    listEl.innerHTML = (isPE ? `<div style="background:rgba(26,107,107,0.08);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--teal-dark);display:flex;align-items:center;gap:6px;"><i class='ti ti-package' style='font-size:14px;'></i> <strong>Pronta Entrega</strong> — disponível agora</div>` : "") +
+    items.map(i => `
       <div class="cart-item-row">
         <div class="cart-item-thumb ${i.prod.categoria}">${i.prod.emoji}</div>
         <div class="cart-item-info">
@@ -2322,9 +2583,9 @@ function updateCartUI() {
         <div class="cart-item-right">
           <div class="cart-item-total">R$ ${(i.prod.preco*i.qty).toFixed(2).replace(".",",")}</div>
           <div class="mini-qty-ctrl">
-            <button class="mini-btn" onclick="changeQty('${i.prod.id}',-1)">−</button>
+            <button class="mini-btn" onclick="${i.prod._pe ? `changePEQty('${i.prod.id}',-1)` : `changeQty('${i.prod.id}',-1)`}">−</button>
             <span class="mini-qty">${i.qty}</span>
-            <button class="mini-btn" onclick="changeQty('${i.prod.id}',1)">+</button>
+            <button class="mini-btn" onclick="${i.prod._pe ? `changePEQty('${i.prod.id}',1)` : `changeQty('${i.prod.id}',1)`}">+</button>
           </div>
         </div>
       </div>`).join("");
@@ -2332,7 +2593,8 @@ function updateCartUI() {
     document.getElementById("cart-subtotal").textContent = `R$ ${total.toFixed(2).replace(".",",")}`;
     document.getElementById("cart-total").textContent    = `R$ ${total.toFixed(2).replace(".",",")}`;
     // WhatsApp
-    const msg = encodeURIComponent("Olá Panillo! Quero fazer um pedido:\n" + items.map(i=>`• ${i.qty}x ${i.prod.nome} = R$ ${(i.prod.preco*i.qty).toFixed(2)}`).join("\n") + `\n*Total: R$ ${total.toFixed(2)}*`);
+    const tipoPed = isPE ? "🛒 Pronta Entrega" : "📅 Encomenda";
+    const msg = encodeURIComponent(`Olá Panillo! Quero fazer um pedido (${tipoPed}):\n` + items.map(i=>`• ${i.qty}x ${i.prod.nome} = R$ ${(i.prod.preco*i.qty).toFixed(2)}`).join("\n") + `\n*Total: R$ ${total.toFixed(2)}*`);
     document.getElementById("wpp-btn").onclick = () => window.open(`https://wa.me/${WPP_NUMBER}?text=${msg}`,"_blank");
   }
 }
@@ -2373,6 +2635,9 @@ function openCheckout() {
   document.querySelectorAll(".step-panel").forEach(p => p.classList.remove("active"));
   document.getElementById("step-1").classList.add("active");
   renderOrderSummary("order-summary-1");
+  const isPE = Object.values(cart).some(i => i.prod._pe);
+  const titleEl = document.getElementById("checkout-modal-title");
+  if (titleEl) titleEl.textContent = isPE ? "🛒 Pronta Entrega" : "📅 Finalizar Encomenda";
   // Check returning client
   const saved = localStorage.getItem("panillo-cliente");
   if (saved) {
@@ -2393,9 +2658,28 @@ function openCheckout() {
   } else {
     document.getElementById("ret-banner-wrap").innerHTML = "";
   }
-  // Set min date = tomorrow
-  const tom = new Date(); tom.setDate(tom.getDate()+1);
-  document.getElementById("f-data").min = tom.toISOString().split("T")[0];
+  // Set min date based on order type
+  const isPE = Object.values(cart).some(i => i.prod._pe);
+  const dateInput = document.getElementById("f-data");
+  const dateBlock = dateInput.closest(".fg");
+  if (isPE) {
+    // PE: hide date field, set today
+    if (dateBlock) dateBlock.style.display = "none";
+    dateInput.value = new Date().toISOString().split("T")[0];
+  } else {
+    // Encomenda: min 48h
+    if (dateBlock) dateBlock.style.display = "";
+    const minDate = new Date(); minDate.setDate(minDate.getDate()+2);
+    dateInput.min = minDate.toISOString().split("T")[0];
+    dateInput.value = dateInput.value || "";
+  }
+  // Show fiado option if client has credit
+  const savedClient = JSON.parse(localStorage.getItem("panillo-cliente") || "{}");
+  const fiadoCard = document.getElementById("pay-fiado-card");
+  if (fiadoCard && savedClient.wpp) {
+    const hasCredit = allFiadoAccounts.some(a => a.clientWpp === savedClient.wpp && a.autorizado);
+    fiadoCard.style.display = hasCredit ? "" : "none";
+  }
   document.getElementById("checkout-modal").classList.add("open");
 }
 
@@ -2408,7 +2692,6 @@ async function goStep(n) {
     const nome = document.getElementById("f-nome").value.trim();
     const wpp  = document.getElementById("f-wpp").value.trim();
     if (!nome || !wpp) { showToast("Preencha nome e WhatsApp!"); return; }
-    // Save client locally
     const client = {
       nome, wpp,
       email: document.getElementById("f-email").value.trim(),
@@ -2416,11 +2699,20 @@ async function goStep(n) {
       obs:   document.getElementById("f-obs").value.trim()
     };
     localStorage.setItem("panillo-cliente", JSON.stringify(client));
+    // Show fiado option if client has credit
+    const fiadoCard = document.getElementById("pay-fiado-card");
+    if (fiadoCard) {
+      const hasCredit = allFiadoAccounts.some(a => a.clientWpp === wpp && a.autorizado);
+      fiadoCard.style.display = hasCredit ? "" : "none";
+    }
     renderOrderSummary("order-summary-2");
   }
   if (n === 3) {
-    const data = document.getElementById("f-data").value;
-    if (!data) { showToast("Escolha a data de retirada!"); return; }
+    const isPE = Object.values(cart).some(i => i.prod._pe);
+    if (!isPE) {
+      const data = document.getElementById("f-data").value;
+      if (!data) { showToast("Escolha a data de retirada!"); return; }
+    }
     if (!selectedPay) { showToast("Escolha a forma de pagamento!"); return; }
     await submitOrder();
     return;
@@ -2437,6 +2729,7 @@ async function submitOrder() {
   const client = JSON.parse(localStorage.getItem("panillo-cliente") || "{}");
   const enderecoIdx = document.querySelector('input[name="endereco"]:checked')?.value || "1";
   const orderNum = "PAN" + Date.now().toString().slice(-6);
+  const isPE = Object.values(cart).some(i => i.prod._pe);
 
   const order = {
     numero: orderNum,
@@ -2447,7 +2740,8 @@ async function submitOrder() {
     })),
     total,
     enderecoIdx,
-    dataRetirada: document.getElementById("f-data").value,
+    tipo: isPE ? "pronta-entrega" : "encomenda",
+    dataRetirada: isPE ? new Date().toISOString().split("T")[0] : document.getElementById("f-data").value,
     periodo: document.getElementById("f-periodo").value,
     pagamento: selectedPay,
     status: "pendente"
@@ -2455,6 +2749,27 @@ async function submitOrder() {
   try {
     await fbAdd("orders", order);
     await saveClientToFirebase(client, order);
+    // Decrement PE stock
+    if (isPE) {
+      for (const item of items) {
+        if (item.prod._pe && item.prod.id) {
+          const s = allStock[item.prod.id] || {};
+          const newQty = Math.max(0, (s.qty || 0) - item.qty);
+          allStock[item.prod.id] = { ...s, qty: newQty };
+          try {
+            const stockDocs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prod.id)));
+            if (!stockDocs.empty) {
+              await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
+            }
+          } catch(e) { console.warn("stock update err", e); }
+        }
+      }
+      renderPEProducts();
+    }
+    // Handle fiado payment
+    if (selectedPay === "fiado") {
+      await addFiadoDebt(client, order);
+    }
   } catch(e) { console.warn("Firebase offline", e); }
 
   // Update UI
@@ -2472,13 +2787,16 @@ async function submitOrder() {
     if (i.prod.sabores?.length) s += ` (${i.prod.sabores.join(", ")})`;
     return s;
   }).join("\n");
+  const tipoPed = isPE ? "🛒 Pronta Entrega" : "📅 Encomenda";
+  const dataExibir = isPE ? "Hoje" : new Date(order.dataRetirada+"T12:00:00").toLocaleDateString("pt-BR");
   const wppMsg = encodeURIComponent(
-    `Olá Panillo! Acabei de fazer um pedido:\n\n${saboresStr}\n\nTotal: R$ ${total.toFixed(2)}\nPagamento: ${selectedPay}\nRetirada: ${new Date(order.dataRetirada+"T12:00:00").toLocaleDateString("pt-BR")}\nLocal: ${addr}\nPedido: #${orderNum}`
+    `Olá Panillo! Acabei de fazer um pedido:\n\n${saboresStr}\n\nTotal: R$ ${total.toFixed(2)}\nTipo: ${tipoPed}\nPagamento: ${selectedPay}\nRetirada: ${dataExibir}\nLocal: ${addr}\nPedido: #${orderNum}`
   );
   document.getElementById("success-wpp-btn").onclick = () => window.open(`https://wa.me/${WPP_NUMBER}?text=${wppMsg}`,"_blank");
   cart = {};
   updateCartUI();
   document.querySelectorAll("[id^='qty-']").forEach(el => el.textContent = 0);
+  document.querySelectorAll("[id^='pe-qty-']").forEach(el => el.textContent = 0);
   loadOrders();
 }
 
@@ -2542,7 +2860,7 @@ function renderOrders() {
       </tr>`).join("");
 }
 
-function payLabel(p) { return { pix:"Pix", credito:"Crédito", debito:"Débito" }[p] || p || "—"; }
+function payLabel(p) { return { pix:"Pix", credito:"Crédito", debito:"Débito", fiado:"Fiado" }[p] || p || "—"; }
 function statusClass(s) { return { pendente:"s-pending", confirmado:"s-confirmed", pronto:"s-ready", entregue:"s-done" }[s] || "s-pending"; }
 
 async function updateOrderStatus(id, status) {
@@ -2620,6 +2938,352 @@ function renderAdminProducts() {
       </div>
     </div>`;
   }).join("");
+}
+
+// ─── ADMIN: STOCK PRONTA ENTREGA ───────────────────────
+async function loadStock() {
+  try {
+    const docs = await fbGet("stock");
+    allStock = {};
+    docs.forEach(d => { allStock[d.prodId] = { id: d.id, qty: d.qty || 0, ativo: d.ativo || false }; });
+  } catch { allStock = {}; }
+  renderPEProducts();
+}
+
+function renderStockAdmin() {
+  const grid = document.getElementById("stock-admin-grid");
+  if (!grid) return;
+  const prods = allProducts.filter(p => p.ativo !== false && p.categoria !== "combo");
+  if (prods.length === 0) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px;">Cadastre produtos no Cardápio primeiro.</div>';
+    return;
+  }
+  grid.innerHTML = prods.map(p => {
+    const s = allStock[p.id] || { qty: 0, ativo: false };
+    const isOn = s.ativo;
+    const cat = p.categoria || "cookie";
+    return `<div class="stock-admin-card">
+      <div class="sac-img ${cat}">
+        <span>${p.emoji || "🍪"}</span>
+        <span class="sac-pe-badge ${isOn?'on':'off'}">${isOn?"PE ativo":"PE inativo"}</span>
+      </div>
+      <div class="sac-body">
+        <div class="sac-name">${p.nome}</div>
+        <div class="sac-price">R$ ${Number(p.preco).toFixed(2).replace(".",",")}</div>
+        <div class="sac-qty-row">
+          <span class="sac-qty-label">Qtd. em estoque:</span>
+          <input class="sac-qty-input" type="number" min="0" value="${s.qty}" id="stock-qty-${p.id}" placeholder="0">
+        </div>
+        <div class="sac-btn-row">
+          <button class="sac-toggle-btn ${isOn?'disable':'enable'}" onclick="toggleStockProduct('${p.id}',${isOn})">
+            ${isOn?"⏸ Desativar PE":"▶ Ativar PE"}
+          </button>
+          <button class="sac-save-btn" onclick="saveStockQty('${p.id}')">💾 Salvar</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function saveStockQty(prodId) {
+  const input = document.getElementById("stock-qty-" + prodId);
+  const qty = parseInt(input.value) || 0;
+  const s = allStock[prodId] || { ativo: false };
+  try {
+    const docs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId)));
+    if (docs.empty) {
+      const ref = await fbAdd("stock", { prodId, qty, ativo: s.ativo || false });
+      allStock[prodId] = { id: ref.id, qty, ativo: s.ativo || false };
+    } else {
+      await FB.updateDoc(docs.docs[0].ref, { qty });
+      allStock[prodId] = { ...s, id: docs.docs[0].id, qty };
+    }
+    showToast("Estoque salvo!");
+    renderPEProducts();
+  } catch(e) { showToast("Erro ao salvar estoque"); console.error(e); }
+}
+
+async function toggleStockProduct(prodId, currentState) {
+  const newState = !currentState;
+  const qty = parseInt(document.getElementById("stock-qty-" + prodId)?.value) || 0;
+  try {
+    const docs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId)));
+    if (docs.empty) {
+      const ref = await fbAdd("stock", { prodId, qty, ativo: newState });
+      allStock[prodId] = { id: ref.id, qty, ativo: newState };
+    } else {
+      await FB.updateDoc(docs.docs[0].ref, { ativo: newState, qty });
+      allStock[prodId] = { ...(allStock[prodId]||{}), id: docs.docs[0].id, qty, ativo: newState };
+    }
+    showToast(newState ? "Produto ativado para Pronta Entrega!" : "Produto removido da Pronta Entrega!");
+    renderStockAdmin();
+    renderPEProducts();
+  } catch(e) { showToast("Erro ao alterar status"); console.error(e); }
+}
+
+// ─── ADMIN: CONTAS FIADO ───────────────────────────────
+async function loadFiadoAccounts() {
+  try { allFiadoAccounts = await fbGet("fiadoAccounts"); } catch { allFiadoAccounts = []; }
+  const activeCount = allFiadoAccounts.filter(a => a.autorizado).length;
+  const badgeEl = document.getElementById("badge-fiado");
+  if (badgeEl) badgeEl.textContent = activeCount;
+}
+
+async function renderFiadoAdmin() {
+  await loadFiadoAccounts();
+  const list = document.getElementById("fiado-client-list");
+  if (!list) return;
+
+  const active = allFiadoAccounts.filter(a => a.autorizado);
+  const totalAberto = active.reduce((s,a) => s + (a.saldo || 0), 0);
+
+  // Calcular recebido este mês
+  const now = new Date();
+  let recebidoMes = 0;
+  active.forEach(a => {
+    (a.historico || []).forEach(h => {
+      if (h.tipo === "pagamento") {
+        const hDate = new Date(h.data);
+        if (hDate.getMonth() === now.getMonth() && hDate.getFullYear() === now.getFullYear()) {
+          recebidoMes += h.valor || 0;
+        }
+      }
+    });
+  });
+
+  const fmCount = document.getElementById("fm-count");
+  const fmTotal = document.getElementById("fm-total");
+  const fmRecebido = document.getElementById("fm-recebido");
+  if (fmCount) fmCount.textContent = active.length;
+  if (fmTotal) fmTotal.textContent = "R$ " + totalAberto.toFixed(2).replace(".",",");
+  if (fmRecebido) fmRecebido.textContent = "R$ " + recebidoMes.toFixed(2).replace(".",",");
+
+  if (active.length === 0) {
+    list.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">🤝</div>
+      Nenhum cliente com conta fiado ativa. Use o botão "Autorizar cliente" para começar.
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = active.map(a => {
+    const saldo = a.saldo || 0;
+    const badgeClass = saldo > 0 ? "fiado-danger" : "fiado-zero";
+    const badgeText = saldo > 0 ? `R$ ${saldo.toFixed(2).replace(".",",")} em aberto` : "R$ 0,00 — quitado";
+    const hist = (a.historico || []).slice().reverse().slice(0,5);
+    const initials = (a.clientNome || "?").substring(0,2).toUpperCase();
+    const pedCount = (a.historico||[]).filter(h=>h.tipo==="pedido").length;
+    return `<div class="fiado-client-card">
+      <div class="fcc-header" onclick="toggleFiadoDetail('${a.id}')">
+        <div class="fcc-av">${initials}</div>
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+            <span class="fcc-name">${a.clientNome || "—"}</span>
+            <span class="fiado-tag">fiado ativo</span>
+          </div>
+          <div class="fcc-phone">${a.clientWpp || "—"}</div>
+        </div>
+        <span class="fiado-badge ${badgeClass}">${badgeText}</span>
+        <i class="ti ti-chevron-down" id="fchev-${a.id}" style="font-size:16px;color:var(--muted);transition:transform .2s;flex-shrink:0;margin-left:8px;"></i>
+      </div>
+      <div class="fcc-detail" id="fdetail-${a.id}">
+        <div class="fcc-detail-grid">
+          <div class="fd-card">
+            <div class="fd-label">Saldo devedor</div>
+            <div class="fd-val ${saldo>0?'red':''}" id="fsaldo-${a.id}">R$ ${saldo.toFixed(2).replace(".",",")}</div>
+          </div>
+          <div class="fd-card">
+            <div class="fd-label">Pedidos no fiado</div>
+            <div class="fd-val">${pedCount} pedido${pedCount!==1?"s":""}</div>
+          </div>
+        </div>
+        ${a.limite ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Limite: R$ ${Number(a.limite).toFixed(2).replace(".",",")} &nbsp;|&nbsp; Disponível: R$ ${Math.max(0, a.limite - saldo).toFixed(2).replace(".",",")}</div>` : ""}
+        <div class="fcc-hist-title">Histórico recente</div>
+        ${hist.length === 0 ? '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Nenhum lançamento ainda.</div>' :
+          hist.map(h => {
+            const isDeb = h.tipo === "pedido";
+            return `<div class="fcc-hist-item">
+              <div class="fcc-hist-dot ${isDeb?'hist-dot-pedido':'hist-dot-pagto'}">
+                <i class="ti ${isDeb?'ti-shopping-bag':'ti-cash'}"></i>
+              </div>
+              <div class="fcc-hist-info">
+                <div class="fcc-hist-desc">${h.descricao || (isDeb?"Pedido":"Pagamento")}</div>
+                <div class="fcc-hist-date">${h.data || "—"}</div>
+              </div>
+              <div class="fcc-hist-val ${isDeb?'debit':'credit'}">${isDeb?'+':'-'}R$ ${Number(h.valor||0).toFixed(2).replace(".",",")}</div>
+            </div>`;
+          }).join("")}
+        <div class="fcc-action-row">
+          <button class="fcc-pagto-btn" onclick="toggleFiadoForm('${a.id}')">
+            <i class="ti ti-cash" style="font-size:14px;"></i> Registrar pagamento
+          </button>
+          <button class="fcc-revoke-btn" onclick="revokeCredit('${a.id}','${(a.clientNome||'').replace(/'/g,"\\'")}')">
+            <i class="ti ti-ban" style="font-size:14px;"></i> Revogar crédito
+          </button>
+        </div>
+        <div class="fcc-pagto-form" id="fpagto-${a.id}">
+          <label>Valor recebido (R$) *</label>
+          <input class="fi" type="number" id="fpval-${a.id}" placeholder="Ex: 50.00" step="0.01" min="0.01">
+          <label>Forma de pagamento</label>
+          <input class="fi" type="text" id="fpmet-${a.id}" placeholder="Ex: Pix, dinheiro, cartão...">
+          <label>Observação (opcional)</label>
+          <input class="fi" type="text" id="fpobs-${a.id}" placeholder="Ex: referente a maio">
+          <div style="margin-top:12px;">
+            <button class="btn-sm-primary" style="width:100%;padding:11px;" onclick="registerFiadoPayment('${a.id}',${saldo})">
+              Confirmar pagamento
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function toggleFiadoDetail(id) {
+  const detail = document.getElementById("fdetail-" + id);
+  const chev   = document.getElementById("fchev-" + id);
+  if (!detail) return;
+  const isOpen = detail.classList.contains("open");
+  // Close all
+  document.querySelectorAll(".fcc-detail").forEach(d => d.classList.remove("open"));
+  document.querySelectorAll("[id^='fchev-']").forEach(c => c.style.transform = "");
+  if (!isOpen) {
+    detail.classList.add("open");
+    if (chev) chev.style.transform = "rotate(180deg)";
+  }
+}
+
+function toggleFiadoForm(id) {
+  const form = document.getElementById("fpagto-" + id);
+  if (form) form.classList.toggle("open");
+}
+
+async function registerFiadoPayment(accountId, currentSaldo) {
+  const valInput = document.getElementById("fpval-" + accountId);
+  const metInput = document.getElementById("fpmet-" + accountId);
+  const obsInput = document.getElementById("fpobs-" + accountId);
+  const val = parseFloat(valInput?.value);
+  if (!val || val <= 0) { showToast("Informe um valor válido!"); return; }
+
+  const newSaldo = Math.max(0, currentSaldo - val);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("pt-BR");
+
+  try {
+    const account = allFiadoAccounts.find(a => a.id === accountId);
+    if (!account) return;
+    const newHist = [...(account.historico || []), {
+      tipo: "pagamento",
+      descricao: `Pagamento recebido${metInput?.value ? " — " + metInput.value : ""}${obsInput?.value ? " (" + obsInput.value + ")" : ""}`,
+      valor: val,
+      data: dateStr
+    }];
+    await fbUpdate("fiadoAccounts", accountId, { saldo: newSaldo, historico: newHist });
+    allFiadoAccounts = allFiadoAccounts.map(a => a.id === accountId ? { ...a, saldo: newSaldo, historico: newHist } : a);
+    showToast(`Pagamento de R$ ${val.toFixed(2).replace(".",",")} registrado!`);
+    renderFiadoAdmin();
+  } catch(e) { showToast("Erro ao registrar pagamento"); console.error(e); }
+}
+
+async function revokeCredit(accountId, clientName) {
+  if (!confirm(`Revogar o crédito fiado de ${clientName}? O saldo em aberto não será cancelado.`)) return;
+  try {
+    await fbUpdate("fiadoAccounts", accountId, { autorizado: false });
+    allFiadoAccounts = allFiadoAccounts.map(a => a.id === accountId ? { ...a, autorizado: false } : a);
+    showToast("Crédito revogado.");
+    renderFiadoAdmin();
+  } catch(e) { showToast("Erro ao revogar crédito"); }
+}
+
+async function addFiadoDebt(client, order) {
+  try {
+    const account = allFiadoAccounts.find(a => a.clientWpp === client.wpp && a.autorizado);
+    if (!account) return;
+    const now = new Date();
+    const newHist = [...(account.historico || []), {
+      tipo: "pedido",
+      descricao: `Pedido #${order.numero} — ${(order.itens||[]).map(i=>`${i.qty}× ${i.nome}`).join(", ")}`,
+      valor: order.total,
+      data: now.toLocaleDateString("pt-BR")
+    }];
+    const newSaldo = (account.saldo || 0) + order.total;
+    await fbUpdate("fiadoAccounts", account.id, { saldo: newSaldo, historico: newHist });
+    allFiadoAccounts = allFiadoAccounts.map(a => a.id === account.id ? { ...a, saldo: newSaldo, historico: newHist } : a);
+    const badge = document.getElementById("badge-fiado");
+    if (badge) badge.textContent = allFiadoAccounts.filter(a=>a.autorizado).length;
+  } catch(e) { console.warn("Fiado debt error", e); }
+}
+
+// ─── FIADO AUTH MODAL ──────────────────────────────────
+function openFiadoAuthModal() {
+  foundFiadoClient = null;
+  const inp = document.getElementById("fiado-search-wpp");
+  if (inp) inp.value = "";
+  document.getElementById("fiado-client-found").style.display = "none";
+  document.getElementById("fiado-no-client").style.display   = "none";
+  document.getElementById("fiado-confirm-btn").style.display = "none";
+  document.getElementById("fiado-limite").value = "";
+  document.getElementById("fiado-obs").value    = "";
+  document.getElementById("fiado-auth-modal").classList.add("open");
+}
+
+function closeFiadoAuthModal() {
+  document.getElementById("fiado-auth-modal").classList.remove("open");
+}
+
+async function searchClientForFiado() {
+  const wpp = document.getElementById("fiado-search-wpp").value.trim();
+  if (!wpp) { showToast("Informe o WhatsApp!"); return; }
+  try {
+    const snap = await FB.getDocs(FB.query(FB.collection(db,"clients"), FB.where("wpp","==",wpp)));
+    if (snap.empty) {
+      document.getElementById("fiado-client-found").style.display = "none";
+      document.getElementById("fiado-no-client").style.display   = "block";
+      document.getElementById("fiado-confirm-btn").style.display = "none";
+      foundFiadoClient = null;
+      return;
+    }
+    const cDoc = snap.docs[0];
+    foundFiadoClient = { id: cDoc.id, ...cDoc.data() };
+    document.getElementById("fiado-found-name").textContent = foundFiadoClient.nome || "—";
+    document.getElementById("fiado-found-wpp").textContent  = foundFiadoClient.wpp  || "—";
+    document.getElementById("fiado-client-found").style.display = "block";
+    document.getElementById("fiado-no-client").style.display   = "none";
+    document.getElementById("fiado-confirm-btn").style.display = "";
+  } catch(e) { showToast("Erro ao buscar cliente"); console.error(e); }
+}
+
+async function confirmFiadoAuth() {
+  if (!foundFiadoClient) { showToast("Busque um cliente primeiro!"); return; }
+  const limite = parseFloat(document.getElementById("fiado-limite").value) || null;
+  const obs    = document.getElementById("fiado-obs").value.trim();
+
+  // Check if already has an account
+  const existing = allFiadoAccounts.find(a => a.clientWpp === foundFiadoClient.wpp);
+  try {
+    if (existing) {
+      await fbUpdate("fiadoAccounts", existing.id, { autorizado: true, ...(limite?{limite}:{}), ...(obs?{obs}:{}) });
+      allFiadoAccounts = allFiadoAccounts.map(a => a.id === existing.id ? { ...a, autorizado: true } : a);
+    } else {
+      const data = {
+        clientId:   foundFiadoClient.id,
+        clientNome: foundFiadoClient.nome,
+        clientWpp:  foundFiadoClient.wpp,
+        saldo:      0,
+        autorizado: true,
+        historico:  [],
+        ...(limite ? { limite } : {}),
+        ...(obs    ? { obs    } : {})
+      };
+      const ref = await fbAdd("fiadoAccounts", data);
+      allFiadoAccounts.push({ id: ref.id, ...data });
+    }
+    showToast(`Fiado autorizado para ${foundFiadoClient.nome}!`);
+    closeFiadoAuthModal();
+    renderFiadoAdmin();
+    const badge = document.getElementById("badge-fiado");
+    if (badge) badge.textContent = allFiadoAccounts.filter(a=>a.autorizado).length;
+  } catch(e) { showToast("Erro ao autorizar fiado"); console.error(e); }
 }
 
 function openProdModal(id) {
@@ -3421,6 +4085,191 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 <style>
+/* ═══════════════════════════════════════════════════════
+   PRONTA ENTREGA / ENCOMENDA — TABS NA LOJA
+═══════════════════════════════════════════════════════ */
+.order-mode-hero {
+  background: var(--teal-dark); padding: 36px 40px 0;
+  text-align: center;
+}
+.order-mode-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(200,144,42,0.2); color: var(--gold-light);
+  border: 1px solid rgba(200,144,42,0.3);
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  padding: 4px 12px; border-radius: 20px; margin-bottom: 14px;
+}
+.order-mode-title {
+  font-family: var(--font-display);
+  font-size: 36px; font-weight: 600; color: #fff; line-height: 1.15; margin-bottom: 6px;
+}
+.order-mode-title em { color: var(--gold-light); font-style: normal; }
+.order-mode-sub { color: rgba(255,255,255,0.6); font-size: 13px; margin-bottom: 0; }
+.order-tabs-row {
+  display: flex; gap: 0; padding: 0 24px; background: var(--teal-dark); margin-top: 24px;
+  max-width: 600px; margin-left: auto; margin-right: auto;
+}
+.order-tab-btn {
+  flex: 1; padding: 14px 0; border: none; background: transparent;
+  font-family: var(--font-body); font-size: 14px; font-weight: 500; cursor: pointer;
+  border-radius: 10px 10px 0 0; transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.order-tab-btn.active { background: var(--cream); color: var(--teal-dark); }
+.order-tab-btn:not(.active) { color: rgba(255,255,255,0.55); }
+.order-tab-btn:not(.active):hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.05); }
+
+.pe-stock-info {
+  background: rgba(200,144,42,0.08); border: 1px solid rgba(200,144,42,0.2);
+  border-radius: 10px; padding: 11px 16px; margin-bottom: 20px;
+  font-size: 12px; color: var(--gold-dark); display: flex; align-items: center; gap: 8px;
+}
+.enc-notice {
+  background: var(--gold-pale); border: 1px solid rgba(200,144,42,0.25);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 22px;
+  font-size: 12px; color: var(--brown); display: flex; align-items: flex-start; gap: 10px;
+}
+.enc-notice strong { display: block; font-size: 13px; margin-bottom: 2px; }
+.stock-badge-pe {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 500; padding: 3px 9px; border-radius: 10px; margin-bottom: 10px;
+}
+.stock-ok   { background: rgba(26,107,107,0.10); color: var(--teal); }
+.stock-low  { background: rgba(200,144,42,0.12);  color: var(--gold-dark); }
+.stock-zero { background: rgba(200,80,80,0.10);   color: #c03030; }
+.prod-card-pe { opacity: 0.55; }
+.order-tab-content { display: none; }
+.order-tab-content.active { display: block; }
+
+/* ═══════════════════════════════════════════════════════
+   ADMIN — ESTOQUE PRONTA ENTREGA
+═══════════════════════════════════════════════════════ */
+.stock-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 14px; }
+.stock-admin-card {
+  background: var(--white); border-radius: 12px; border: 0.5px solid var(--border); overflow: hidden;
+}
+.sac-img { height: 100px; display: flex; align-items: center; justify-content: center; font-size: 42px; position: relative; }
+.sac-img.cookie  { background: linear-gradient(135deg,#FDF0DC,#F5E0B0); }
+.sac-img.brownie { background: linear-gradient(135deg,#F5E8DA,#E8D0B8); }
+.sac-img.combo   { background: linear-gradient(135deg,#FDF6E8,#F5E0B0); }
+.sac-pe-badge {
+  position: absolute; top: 7px; right: 7px;
+  font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 8px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.sac-pe-badge.on  { background: #E1F5EE; color: #0F6E56; }
+.sac-pe-badge.off { background: #FDF6E8; color: var(--gold-dark); }
+.sac-body { padding: 12px 14px; }
+.sac-name { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+.sac-price { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+.sac-qty-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sac-qty-label { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.sac-qty-input {
+  flex: 1; border: 1px solid var(--border-mid); border-radius: 7px;
+  padding: 6px 10px; font-size: 13px; text-align: center; background: var(--cream);
+  outline: none;
+}
+.sac-qty-input:focus { border-color: var(--teal-light); background: #fff; }
+.sac-btn-row { display: flex; gap: 6px; }
+.sac-toggle-btn {
+  flex: 1; padding: 7px 8px; border-radius: 7px; font-size: 11px; font-weight: 500;
+  border: 1px solid var(--border-mid); cursor: pointer; transition: all .15s;
+}
+.sac-toggle-btn.enable  { background: #E1F5EE; color: #0F6E56; border-color: #A8D8C8; }
+.sac-toggle-btn.disable { background: #FAECE7; color: #993C1D; border-color: #D88888; }
+.sac-save-btn {
+  flex: 1; padding: 7px 8px; border-radius: 7px; font-size: 11px; font-weight: 500;
+  background: var(--teal-dark); color: #fff; border: none; cursor: pointer; transition: background .15s;
+}
+.sac-save-btn:hover { background: var(--teal); }
+
+/* ═══════════════════════════════════════════════════════
+   ADMIN — CONTAS FIADO
+═══════════════════════════════════════════════════════ */
+.fiado-metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 20px; }
+.fiado-metric { background: var(--white); border-radius: 12px; border: 0.5px solid var(--border); padding: 16px 18px; }
+.fm-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.fm-val { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--teal-dark); }
+.fm-val.danger { color: #c03030; }
+.fm-val.ok { color: #1A7A44; }
+
+.fiado-client-list { display: flex; flex-direction: column; gap: 10px; }
+.fiado-client-card {
+  background: var(--white); border-radius: 12px; border: 0.5px solid var(--border); overflow: hidden;
+}
+.fcc-header {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer;
+  transition: background .15s;
+}
+.fcc-header:hover { background: var(--cream); }
+.fcc-av {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--teal-dark); color: #fff;
+  font-size: 13px; font-weight: 500; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.fcc-name { font-size: 14px; font-weight: 500; color: var(--teal-dark); }
+.fcc-phone { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.fiado-badge { padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; flex-shrink: 0; }
+.fiado-danger { background: #FCEBEB; color: #A32D2D; }
+.fiado-ok { background: #E1F5EE; color: #085041; }
+.fiado-zero { background: var(--cream-dark); color: var(--muted); }
+.fiado-tag { background: rgba(200,144,42,0.12); color: var(--gold-dark); font-size: 10px; padding: 2px 8px; border-radius: 6px; font-weight: 500; margin-left: 6px; }
+
+.fcc-detail { display: none; border-top: 0.5px solid var(--border); padding: 0 16px 16px; }
+.fcc-detail.open { display: block; }
+.fcc-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+.fd-card { background: var(--cream); border-radius: 8px; padding: 10px 12px; }
+.fd-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.fd-val { font-size: 18px; font-weight: 600; color: var(--teal-dark); }
+.fd-val.red { color: #c03030; }
+
+.fcc-hist-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 12px 0 8px; }
+.fcc-hist-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--border); }
+.fcc-hist-item:last-child { border-bottom: none; }
+.fcc-hist-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.hist-dot-pedido { background: #E1F5EE; }
+.hist-dot-pedido i { color: #0F6E56; font-size: 14px; }
+.hist-dot-pagto { background: #FDF6E8; }
+.hist-dot-pagto i { color: #854F0B; font-size: 14px; }
+.fcc-hist-info { flex: 1; }
+.fcc-hist-desc { font-size: 12px; color: var(--teal-dark); font-weight: 500; }
+.fcc-hist-date { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.fcc-hist-val { font-size: 13px; font-weight: 500; }
+.fcc-hist-val.debit  { color: #c03030; }
+.fcc-hist-val.credit { color: #0F6E56; }
+
+.fcc-action-row { display: flex; gap: 8px; margin-top: 14px; }
+.fcc-pagto-btn {
+  flex: 1; background: var(--teal-dark); color: #fff; border: none;
+  padding: 9px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s;
+}
+.fcc-pagto-btn:hover { background: var(--teal); }
+.fcc-revoke-btn {
+  flex: 1; border: 1px solid rgba(200,50,50,0.25); background: #fff;
+  color: #c03030; padding: 9px 12px; border-radius: 8px; font-size: 12px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s;
+}
+.fcc-revoke-btn:hover { background: #FCEBEB; }
+
+.fcc-pagto-form {
+  background: var(--cream); border-radius: 10px; padding: 14px; margin-top: 12px; display: none;
+}
+.fcc-pagto-form.open { display: block; }
+.fcc-pagto-form label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; margin-top: 10px; }
+.fcc-pagto-form label:first-child { margin-top: 0; }
+
+.fiado-auth-card {
+  background: var(--white); border-radius: 12px; border: 0.5px solid var(--border);
+  padding: 16px 20px; margin-top: 16px; display: flex; align-items: center; justify-content: space-between;
+}
+
+/* ═══════════════════════════════════════════════════════
+   AUTHORIZE FIADO MODAL
+═══════════════════════════════════════════════════════ */
+#fiado-auth-modal.open { display: flex; }
+
 /* ─── EXTRAS: urgency bar, dep cards, combo prod-img ─── */
 .urgency-bar {
   display: inline-flex; align-items: center; gap: 6px;
