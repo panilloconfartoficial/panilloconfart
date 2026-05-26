@@ -1,12 +1,13 @@
 {
+  "outputDirectory": "public",
   "rewrites": [
     {
       "source": "/admin",
-      "destination": "/public/index.html"
+      "destination": "/index.html"
     },
     {
       "source": "/admin/",
-      "destination": "/public/index.html"
+      "destination": "/index.html"
     },
     {
       "source": "/api/(.*)",
@@ -14,7 +15,7 @@
     },
     {
       "source": "/(.*)",
-      "destination": "/public/$1"
+      "destination": "/$1"
     }
   ]
 }
