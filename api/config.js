@@ -34,7 +34,9 @@ export default function handler(req, res) {
       messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
       appId:             process.env.FIREBASE_APP_ID,
     },
-    wppNumber: process.env.WPP_NUMBER,
-    pixKey:    process.env.PIX_KEY,
+    wppNumber:   process.env.WPP_NUMBER,
+    pixKey:      process.env.PIX_KEY,
+    // FCM VAPID key para notificações push (opcional)
+    fcmVapidKey: process.env.FCM_VAPID_KEY || "",
   });
 }
