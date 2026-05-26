@@ -3201,8 +3201,11 @@ function renderAdminProducts() {
     const toggleLabel = inativo ? 'Ativar' : 'Desativar';
     const nomeSafe = p.nome.replace(/'/g, "\\'");
     return `<div class="prod-admin-card" style="opacity:${inativo?'0.55':'1'}">
-      <div class="pac-img ${p.categoria}" style="position:relative;">
-        ${p.emoji||"🍪"}
+      <div class="pac-img ${p.categoria}" style="position:relative;${p.fotoUrl?'padding:0;overflow:hidden;':''}">
+        ${p.fotoUrl
+          ? `<img src="${p.fotoUrl}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          + `<span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:40px;">${p.emoji||"🍪"}</span>`
+          : p.emoji||"🍪"}
         ${badegeInativo}
       </div>
       <div class="pac-body">
@@ -3567,9 +3570,21 @@ async function confirmFiadoAuth() {
 function openProdModal(id) {
   editingProdId = id || null;
   ingRows = 0;
+  _currentPhotoBase64 = null;
   document.getElementById("pm-ings").innerHTML = "";
   document.getElementById("pm-custo-est").textContent = "—";
   document.getElementById("pm-margem-est").textContent = "—";
+
+  // Reset photo preview
+  const photoPreview = document.getElementById("photo-preview");
+  const photoIcon    = document.getElementById("photo-icon");
+  const photoSpan    = document.getElementById("photo-span");
+  photoPreview.src = "";
+  photoPreview.style.display = "none";
+  photoIcon.style.display = "";
+  photoSpan.style.display = "";
+  document.getElementById("photo-input").value = "";
+
   if (id) {
     const p = allProducts.find(x => x.id === id);
     if (p) {
@@ -3580,6 +3595,14 @@ function openProdModal(id) {
       document.getElementById("pm-rend").value  = p.rendimento || "";
       document.getElementById("pm-title").textContent = "Editar produto";
       if (p.ingredientes) p.ingredientes.forEach(i => addIngRow(i));
+      // Restaura foto existente
+      if (p.fotoUrl) {
+        _currentPhotoBase64 = p.fotoUrl;
+        photoPreview.src = p.fotoUrl;
+        photoPreview.style.display = "block";
+        photoIcon.style.display = "none";
+        photoSpan.style.display = "none";
+      }
     }
   } else {
     document.getElementById("pm-nome").value  = "";
@@ -3672,6 +3695,7 @@ async function saveProduct() {
     emoji:         isCombo ? "🎁" : cat === "brownie" ? "🍫" : "🍪",
     ingredientes,
     badge: "",
+    fotoUrl:       _currentPhotoBase64 || null,
     ...(isCombo ? {
       comboCookies:  parseInt(document.getElementById("pm-combo-cookies").value)  || 0,
       comboBrownies: parseInt(document.getElementById("pm-combo-brownies").value) || 0,
@@ -4067,16 +4091,34 @@ function togglePeriod() {
 }
 
 // ─── PHOTO PREVIEW ─────────────────────────────────────
+let _currentPhotoBase64 = null; // guarda a foto comprimida para salvar
+
 function previewPhoto(input) {
   const file = input.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    const img = document.getElementById("photo-preview");
-    img.src = e.target.result;
-    img.style.display = "block";
-    document.getElementById("photo-icon").style.display = "none";
-    document.getElementById("photo-span").style.display = "none";
+    // Comprime a imagem via canvas (máx 600px, qualidade 0.75)
+    const original = new Image();
+    original.onload = () => {
+      const MAX = 600;
+      let w = original.width, h = original.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else       { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(original, 0, 0, w, h);
+      const compressed = canvas.toDataURL("image/jpeg", 0.75);
+      _currentPhotoBase64 = compressed;
+      const img = document.getElementById("photo-preview");
+      img.src = compressed;
+      img.style.display = "block";
+      document.getElementById("photo-icon").style.display = "none";
+      document.getElementById("photo-span").style.display = "none";
+    };
+    original.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
