@@ -827,13 +827,31 @@ img { max-width: 100%; display: block; }
 /* photo upload zone */
 .photo-zone {
   border: 2px dashed var(--border-mid); border-radius: 12px;
-  height: 140px; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 8px; cursor: pointer; transition: border-color .2s; margin-bottom: 14px;
+  height: 180px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8px; cursor: pointer; transition: border-color .2s; margin-bottom: 0;
+  overflow: hidden; position: relative;
 }
 .photo-zone:hover { border-color: var(--teal-light); }
 .photo-zone span { font-size: 13px; color: var(--muted); }
 .photo-zone .icon { font-size: 28px; color: var(--muted); }
 #photo-preview { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: none; }
+/* Crop controls */
+.photo-crop-panel {
+  display: none; background: var(--cream); border: 1px solid var(--border-mid);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; margin-top: 10px;
+}
+.photo-crop-panel.visible { display: block; }
+.crop-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.crop-row:last-child { margin-bottom: 0; }
+.crop-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; width: 54px; flex-shrink: 0; }
+.crop-slider { flex: 1; accent-color: var(--teal-dark); cursor: pointer; }
+.crop-val { font-size: 11px; color: var(--teal-dark); font-weight: 500; width: 34px; text-align: right; flex-shrink: 0; }
+.crop-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+.photo-change-btn {
+  font-size: 11px; color: var(--teal-dark); background: transparent; border: 1px solid var(--border-mid);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer; margin-top: 8px; transition: background .15s;
+}
+.photo-change-btn:hover { background: var(--cream-dark); }
 
 /* ai desc btn */
 .ai-desc-row { display: flex; gap: 8px; align-items: flex-start; }
@@ -1632,12 +1650,35 @@ img { max-width: 100%; display: block; }
       <button class="modal-close" onclick="closeProdModal()"><i class="ti ti-x"></i></button>
     </div>
     <div class="pm-body">
-      <div class="photo-zone" onclick="document.getElementById('photo-input').click()">
+      <div class="photo-zone" id="photo-zone" onclick="document.getElementById('photo-input').click()">
         <img id="photo-preview" alt="preview">
         <i class="ti ti-photo icon" id="photo-icon"></i>
         <span id="photo-span">Clique para adicionar foto do produto</span>
       </div>
       <input type="file" id="photo-input" accept="image/*" style="display:none;" onchange="previewPhoto(this)">
+      <!-- Painel de ajuste de enquadramento (aparece só quando há foto) -->
+      <div class="photo-crop-panel" id="photo-crop-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span style="font-size:12px;font-weight:500;color:var(--teal-dark);">🔧 Ajustar enquadramento</span>
+          <button class="photo-change-btn" onclick="document.getElementById('photo-input').click();event.stopPropagation();">Trocar foto</button>
+        </div>
+        <div class="crop-row">
+          <span class="crop-lbl">Zoom</span>
+          <input class="crop-slider" type="range" id="crop-zoom" min="100" max="250" value="100" oninput="applyCropPreview()">
+          <span class="crop-val" id="crop-zoom-val">100%</span>
+        </div>
+        <div class="crop-row">
+          <span class="crop-lbl">Horizontal</span>
+          <input class="crop-slider" type="range" id="crop-x" min="0" max="100" value="50" oninput="applyCropPreview()">
+          <span class="crop-val" id="crop-x-val">50%</span>
+        </div>
+        <div class="crop-row">
+          <span class="crop-lbl">Vertical</span>
+          <input class="crop-slider" type="range" id="crop-y" min="0" max="100" value="50" oninput="applyCropPreview()">
+          <span class="crop-val" id="crop-y-val">50%</span>
+        </div>
+        <div class="crop-hint">Arraste os sliders para centralizar o produto na foto. O enquadramento será salvo.</div>
+      </div>
       <div class="f2" style="margin-bottom:13px;">
         <div class="fg">
           <label class="fl">Nome do produto <span class="req">*</span></label>
@@ -1993,7 +2034,6 @@ img { max-width: 100%; display: block; }
                 <th>Pedidos</th>
                 <th>Total gasto</th>
                 <th>Favorito</th>
-                <th>Fiado</th>
               </tr>
             </thead>
             <tbody id="clients-tbody"></tbody>
@@ -2357,11 +2397,10 @@ img { max-width: 100%; display: block; }
         Ao autorizar um cliente para fiado, ele poderá fazer pedidos e acumular saldo a pagar. O valor será debitado do saldo quando você registrar o pagamento.
       </div>
       <div class="fg" style="margin-bottom:12px;">
-        <label class="fl">Selecionar cliente <span class="req">*</span></label>
+        <label class="fl">Buscar cliente pelo WhatsApp <span class="req">*</span></label>
         <div style="display:flex;gap:8px;">
-          <select class="fi" id="fiado-client-select" style="flex:1;" onchange="selectClientForFiado(this.value)">
-            <option value="">— Escolha um cliente —</option>
-          </select>
+          <input class="fi" id="fiado-search-wpp" type="tel" placeholder="(85) 99999-9999" style="flex:1;">
+          <button class="btn-sm-primary" onclick="searchClientForFiado()" style="white-space:nowrap;">Buscar</button>
         </div>
       </div>
       <div id="fiado-client-found" style="display:none;">
@@ -2661,7 +2700,7 @@ function renderStoreProducts(filter) {
       ? "background:linear-gradient(135deg,#FDF6E8,#F5E0B0);"
       : "background:linear-gradient(135deg,#FDF0DC,#F5E4C0);";
     const imgContent = p.fotoUrl
-      ? `<img src="${p.fotoUrl}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+      ? `<img src="${p.fotoUrl}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;object-position:${p.fotoPos?p.fotoPos.x+'% '+p.fotoPos.y+'%':'50% 50%'};transform:scale(${p.fotoPos?p.fotoPos.zoom/100:1});transform-origin:${p.fotoPos?p.fotoPos.x+'% '+p.fotoPos.y+'%':'50% 50%'};" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
         + `<span style="display:none;font-size:64px;align-items:center;justify-content:center;width:100%;height:100%;">${p.emoji||"🍪"}</span>`
       : `<span style="font-size:64px;">${p.emoji || (isCombo?"🎁":"🍪")}</span>`;
     const comboInfo = isCombo
@@ -3165,7 +3204,7 @@ async function renderClients() {
   const today = new Date();
   const tbody = document.getElementById("clients-tbody");
   tbody.innerHTML = clients.length === 0
-    ? `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Nenhum cliente cadastrado ainda</td></tr>`
+    ? `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Nenhum cliente cadastrado ainda</td></tr>`
     : clients.map(c => {
         let bdayHtml = "—";
         let soon = false;
@@ -3176,10 +3215,6 @@ async function renderClients() {
           soon = diff >= 0 && diff <= 14;
           bdayHtml = `<span class="bday-badge${soon?' bday-soon':''}">${bd.toLocaleDateString("pt-BR",{day:"2-digit",month:"long"})}${soon?' 🎂':''}</span>`;
         }
-        const fiadoAccount = allFiadoAccounts.find(a => a.clientWpp === c.wpp && a.autorizado);
-        const fiadoHtml = fiadoAccount
-          ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#E1F5EE;color:#0F6E56;border:1px solid #A8D8C8;font-size:11px;font-weight:500;padding:3px 10px;border-radius:8px;">🤝 Ativo</span>`
-          : `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--cream-dark);color:var(--muted);font-size:11px;padding:3px 10px;border-radius:8px;">—</span>`;
         return `<tr>
           <td><div class="client-av">${(c.nome||"?").substring(0,2).toUpperCase()}</div></td>
           <td class="client-name">${c.nome||"—"}</td>
@@ -3188,7 +3223,6 @@ async function renderClients() {
           <td>${c.pedidos||0}</td>
           <td>R$ ${Number(c.totalGasto||0).toFixed(2).replace(".",",")}</td>
           <td style="font-size:12px;">${c.favorito||"—"}</td>
-          <td>${fiadoHtml}</td>
         </tr>`;
       }).join("");
 }
@@ -3208,8 +3242,10 @@ function renderAdminProducts() {
     const toggleLabel = inativo ? 'Ativar' : 'Desativar';
     const nomeSafe = p.nome.replace(/'/g, "\\'");
     return `<div class="prod-admin-card" style="opacity:${inativo?'0.55':'1'}">
-      <div class="pac-img ${p.categoria}" style="position:relative;">
-        ${p.emoji||"🍪"}
+      <div class="pac-img ${p.categoria}" style="position:relative;${p.fotoUrl?'padding:0;overflow:hidden;font-size:0;':''}">
+        ${p.fotoUrl
+          ? `<img src="${p.fotoUrl}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;object-position:${p.fotoPos?p.fotoPos.x+'% '+p.fotoPos.y+'%':'50% 50%'};display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:48px;">${p.emoji||'🍪'}</span>`
+          : (p.emoji||'🍪')}
         ${badegeInativo}
       </div>
       <div class="pac-body">
@@ -3502,29 +3538,13 @@ async function addFiadoDebt(client, order) {
 // ─── FIADO AUTH MODAL ──────────────────────────────────
 function openFiadoAuthModal() {
   foundFiadoClient = null;
+  const inp = document.getElementById("fiado-search-wpp");
+  if (inp) inp.value = "";
   document.getElementById("fiado-client-found").style.display = "none";
   document.getElementById("fiado-no-client").style.display   = "none";
   document.getElementById("fiado-confirm-btn").style.display = "none";
   document.getElementById("fiado-limite").value = "";
   document.getElementById("fiado-obs").value    = "";
-
-  // Popula lista suspensa com todos os clientes cadastrados
-  const sel = document.getElementById("fiado-client-select");
-  sel.innerHTML = '<option value="">— Escolha um cliente —</option>';
-  // Busca clientes do Firebase para garantir lista atualizada
-  (async () => {
-    let clients = [];
-    try { clients = await fbGet("clients"); } catch {}
-    clients.sort((a,b) => (a.nome||"").localeCompare(b.nome||"", "pt-BR"));
-    clients.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c.wpp;
-      opt.dataset.nome = c.nome;
-      opt.textContent  = `${c.nome} — ${c.wpp}`;
-      sel.appendChild(opt);
-    });
-  })();
-
   document.getElementById("fiado-auth-modal").classList.add("open");
 }
 
@@ -3532,34 +3552,26 @@ function closeFiadoAuthModal() {
   document.getElementById("fiado-auth-modal").classList.remove("open");
 }
 
-function selectClientForFiado(wpp) {
-  if (!wpp) {
-    foundFiadoClient = null;
-    document.getElementById("fiado-client-found").style.display = "none";
+async function searchClientForFiado() {
+  const wpp = document.getElementById("fiado-search-wpp").value.trim();
+  if (!wpp) { showToast("Informe o WhatsApp!"); return; }
+  try {
+    const snap = await FB.getDocs(FB.query(FB.collection(db,"clients"), FB.where("wpp","==",wpp)));
+    if (snap.empty) {
+      document.getElementById("fiado-client-found").style.display = "none";
+      document.getElementById("fiado-no-client").style.display   = "block";
+      document.getElementById("fiado-confirm-btn").style.display = "none";
+      foundFiadoClient = null;
+      return;
+    }
+    const cDoc = snap.docs[0];
+    foundFiadoClient = { id: cDoc.id, ...cDoc.data() };
+    document.getElementById("fiado-found-name").textContent = foundFiadoClient.nome || "—";
+    document.getElementById("fiado-found-wpp").textContent  = foundFiadoClient.wpp  || "—";
+    document.getElementById("fiado-client-found").style.display = "block";
     document.getElementById("fiado-no-client").style.display   = "none";
-    document.getElementById("fiado-confirm-btn").style.display = "none";
-    return;
-  }
-  // Busca cliente pelo wpp no Firestore
-  (async () => {
-    try {
-      const snap = await FB.getDocs(FB.query(FB.collection(db,"clients"), FB.where("wpp","==",wpp)));
-      if (snap.empty) {
-        document.getElementById("fiado-client-found").style.display = "none";
-        document.getElementById("fiado-no-client").style.display   = "block";
-        document.getElementById("fiado-confirm-btn").style.display = "none";
-        foundFiadoClient = null;
-        return;
-      }
-      const cDoc = snap.docs[0];
-      foundFiadoClient = { id: cDoc.id, ...cDoc.data() };
-      document.getElementById("fiado-found-name").textContent = foundFiadoClient.nome || "—";
-      document.getElementById("fiado-found-wpp").textContent  = foundFiadoClient.wpp  || "—";
-      document.getElementById("fiado-client-found").style.display = "block";
-      document.getElementById("fiado-no-client").style.display   = "none";
-      document.getElementById("fiado-confirm-btn").style.display = "";
-    } catch(e) { showToast("Erro ao buscar cliente"); console.error(e); }
-  })();
+    document.getElementById("fiado-confirm-btn").style.display = "";
+  } catch(e) { showToast("Erro ao buscar cliente"); console.error(e); }
 }
 
 async function confirmFiadoAuth() {
@@ -3598,9 +3610,31 @@ async function confirmFiadoAuth() {
 function openProdModal(id) {
   editingProdId = id || null;
   ingRows = 0;
+  _currentPhotoBase64 = null;
+  _currentFotoPos = { x: 50, y: 50, zoom: 100 };
   document.getElementById("pm-ings").innerHTML = "";
   document.getElementById("pm-custo-est").textContent = "—";
   document.getElementById("pm-margem-est").textContent = "—";
+
+  // Reset photo UI
+  const photoPreview = document.getElementById("photo-preview");
+  const photoIcon    = document.getElementById("photo-icon");
+  const photoSpan    = document.getElementById("photo-span");
+  photoPreview.src = "";
+  photoPreview.style.display = "none";
+  photoPreview.style.transform = "";
+  photoPreview.style.objectPosition = "50% 50%";
+  photoIcon.style.display = "";
+  photoSpan.style.display = "";
+  document.getElementById("photo-input").value = "";
+  document.getElementById("crop-zoom").value = 100;
+  document.getElementById("crop-x").value    = 50;
+  document.getElementById("crop-y").value    = 50;
+  document.getElementById("crop-zoom-val").textContent = "100%";
+  document.getElementById("crop-x-val").textContent    = "50%";
+  document.getElementById("crop-y-val").textContent    = "50%";
+  showCropPanel(false);
+
   if (id) {
     const p = allProducts.find(x => x.id === id);
     if (p) {
@@ -3611,6 +3645,21 @@ function openProdModal(id) {
       document.getElementById("pm-rend").value  = p.rendimento || "";
       document.getElementById("pm-title").textContent = "Editar produto";
       if (p.ingredientes) p.ingredientes.forEach(i => addIngRow(i));
+      // Restaura foto e enquadramento existentes
+      if (p.fotoUrl) {
+        _currentPhotoBase64 = p.fotoUrl;
+        const pos = p.fotoPos || { x: 50, y: 50, zoom: 100 };
+        _currentFotoPos = pos;
+        document.getElementById("crop-zoom").value = pos.zoom;
+        document.getElementById("crop-x").value    = pos.x;
+        document.getElementById("crop-y").value    = pos.y;
+        photoPreview.src = p.fotoUrl;
+        photoPreview.style.display = "block";
+        photoIcon.style.display = "none";
+        photoSpan.style.display = "none";
+        applyCropPreview();
+        showCropPanel(true);
+      }
     }
   } else {
     document.getElementById("pm-nome").value  = "";
@@ -3703,6 +3752,8 @@ async function saveProduct() {
     emoji:         isCombo ? "🎁" : cat === "brownie" ? "🍫" : "🍪",
     ingredientes,
     badge: "",
+    fotoUrl:       _currentPhotoBase64 || null,
+    fotoPos:       _currentPhotoBase64 ? _currentFotoPos : null,
     ...(isCombo ? {
       comboCookies:  parseInt(document.getElementById("pm-combo-cookies").value)  || 0,
       comboBrownies: parseInt(document.getElementById("pm-combo-brownies").value) || 0,
@@ -4097,17 +4148,66 @@ function togglePeriod() {
   document.getElementById("period-btn").textContent = labels[periodMode];
 }
 
-// ─── PHOTO PREVIEW ─────────────────────────────────────
+// ─── PHOTO PREVIEW & CROP ──────────────────────────────
+let _currentPhotoBase64 = null;
+let _currentFotoPos = { x: 50, y: 50, zoom: 100 };
+
+function applyCropPreview() {
+  const zoom = document.getElementById("crop-zoom").value;
+  const x    = document.getElementById("crop-x").value;
+  const y    = document.getElementById("crop-y").value;
+  document.getElementById("crop-zoom-val").textContent = zoom + "%";
+  document.getElementById("crop-x-val").textContent    = x + "%";
+  document.getElementById("crop-y-val").textContent    = y + "%";
+  _currentFotoPos = { x: Number(x), y: Number(y), zoom: Number(zoom) };
+  const img = document.getElementById("photo-preview");
+  img.style.objectFit       = "cover";
+  img.style.objectPosition  = `${x}% ${y}%`;
+  img.style.transform       = `scale(${zoom / 100})`;
+  img.style.transformOrigin = `${x}% ${y}%`;
+}
+
+function showCropPanel(show) {
+  document.getElementById("photo-crop-panel").classList.toggle("visible", show);
+  // Remove onclick on photo-zone so clicking sliders doesn't re-open file picker
+  document.getElementById("photo-zone").onclick = show
+    ? null
+    : () => document.getElementById("photo-input").click();
+}
+
 function previewPhoto(input) {
   const file = input.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    const img = document.getElementById("photo-preview");
-    img.src = e.target.result;
-    img.style.display = "block";
-    document.getElementById("photo-icon").style.display = "none";
-    document.getElementById("photo-span").style.display = "none";
+    const original = new Image();
+    original.onload = () => {
+      const MAX = 800;
+      let w = original.width, h = original.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else       { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(original, 0, 0, w, h);
+      _currentPhotoBase64 = canvas.toDataURL("image/jpeg", 0.82);
+      // Reset crop to center
+      _currentFotoPos = { x: 50, y: 50, zoom: 100 };
+      document.getElementById("crop-zoom").value = 100;
+      document.getElementById("crop-x").value    = 50;
+      document.getElementById("crop-y").value    = 50;
+      const img = document.getElementById("photo-preview");
+      img.src = _currentPhotoBase64;
+      img.style.transform = "";
+      img.style.objectPosition = "50% 50%";
+      img.style.display = "block";
+      document.getElementById("photo-icon").style.display = "none";
+      document.getElementById("photo-span").style.display = "none";
+      applyCropPreview();
+      showCropPanel(true);
+    };
+    original.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
