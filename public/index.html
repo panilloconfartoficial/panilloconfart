@@ -2034,6 +2034,7 @@ img { max-width: 100%; display: block; }
                 <th>Pedidos</th>
                 <th>Total gasto</th>
                 <th>Favorito</th>
+                <th>Fiado</th>
               </tr>
             </thead>
             <tbody id="clients-tbody"></tbody>
@@ -2397,9 +2398,12 @@ img { max-width: 100%; display: block; }
         Ao autorizar um cliente para fiado, ele poderá fazer pedidos e acumular saldo a pagar. O valor será debitado do saldo quando você registrar o pagamento.
       </div>
       <div class="fg" style="margin-bottom:12px;">
-        <label class="fl">Buscar cliente pelo WhatsApp <span class="req">*</span></label>
+        <label class="fl">Buscar cliente pelo nome <span class="req">*</span></label>
         <div style="display:flex;gap:8px;">
-          <input class="fi" id="fiado-search-wpp" type="tel" placeholder="(85) 99999-9999" style="flex:1;">
+          <div style="flex:1;position:relative;">
+            <input class="fi" id="fiado-search-nome" type="text" placeholder="Digite o nome ou escolha da lista…" list="fiado-clients-list" autocomplete="off" style="width:100%;" oninput="onFiadoNameInput()">
+            <datalist id="fiado-clients-list"></datalist>
+          </div>
           <button class="btn-sm-primary" onclick="searchClientForFiado()" style="white-space:nowrap;">Buscar</button>
         </div>
       </div>
@@ -3201,10 +3205,14 @@ function filterOrders(status, btn) {
 async function renderClients() {
   let clients = [];
   try { clients = await fbGet("clients"); } catch {}
+  // Garante que allFiadoAccounts está carregado
+  if (!allFiadoAccounts || allFiadoAccounts.length === 0) {
+    try { allFiadoAccounts = await fbGet("fiadoAccounts"); } catch { allFiadoAccounts = []; }
+  }
   const today = new Date();
   const tbody = document.getElementById("clients-tbody");
   tbody.innerHTML = clients.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Nenhum cliente cadastrado ainda</td></tr>`
+    ? `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Nenhum cliente cadastrado ainda</td></tr>`
     : clients.map(c => {
         let bdayHtml = "—";
         let soon = false;
@@ -3215,6 +3223,17 @@ async function renderClients() {
           soon = diff >= 0 && diff <= 14;
           bdayHtml = `<span class="bday-badge${soon?' bday-soon':''}">${bd.toLocaleDateString("pt-BR",{day:"2-digit",month:"long"})}${soon?' 🎂':''}</span>`;
         }
+        // Badge de fiado
+        const fiadoAcc = allFiadoAccounts.find(a => a.clientWpp === c.wpp);
+        let fiadoHtml;
+        if (fiadoAcc && fiadoAcc.autorizado) {
+          const saldo = Number(fiadoAcc.saldo||0).toFixed(2).replace(".",",");
+          fiadoHtml = `<span style="display:inline-flex;align-items:center;gap:4px;background:#E1F5EE;color:#085041;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:500;">✅ Ativo<span style="color:#aaa;font-weight:400;">· R$${saldo}</span></span>`;
+        } else if (fiadoAcc && !fiadoAcc.autorizado) {
+          fiadoHtml = `<span style="background:#FAECE7;color:#993C1D;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:500;">⛔ Revogado</span>`;
+        } else {
+          fiadoHtml = `<span style="background:var(--cream-dark);color:var(--muted);border-radius:8px;padding:3px 9px;font-size:11px;">—</span>`;
+        }
         return `<tr>
           <td><div class="client-av">${(c.nome||"?").substring(0,2).toUpperCase()}</div></td>
           <td class="client-name">${c.nome||"—"}</td>
@@ -3223,6 +3242,7 @@ async function renderClients() {
           <td>${c.pedidos||0}</td>
           <td>R$ ${Number(c.totalGasto||0).toFixed(2).replace(".",",")}</td>
           <td style="font-size:12px;">${c.favorito||"—"}</td>
+          <td>${fiadoHtml}</td>
         </tr>`;
       }).join("");
 }
@@ -3536,9 +3556,9 @@ async function addFiadoDebt(client, order) {
 }
 
 // ─── FIADO AUTH MODAL ──────────────────────────────────
-function openFiadoAuthModal() {
+async function openFiadoAuthModal() {
   foundFiadoClient = null;
-  const inp = document.getElementById("fiado-search-wpp");
+  const inp = document.getElementById("fiado-search-nome");
   if (inp) inp.value = "";
   document.getElementById("fiado-client-found").style.display = "none";
   document.getElementById("fiado-no-client").style.display   = "none";
@@ -3546,6 +3566,26 @@ function openFiadoAuthModal() {
   document.getElementById("fiado-limite").value = "";
   document.getElementById("fiado-obs").value    = "";
   document.getElementById("fiado-auth-modal").classList.add("open");
+  // Preenche datalist com todos os clientes cadastrados
+  try {
+    const clients = await fbGet("clients");
+    const dl = document.getElementById("fiado-clients-list");
+    if (dl) {
+      dl.innerHTML = clients.map(c =>
+        `<option value="${(c.nome||"").replace(/"/g,"&quot;")}" data-wpp="${c.wpp||""}">${c.nome} · ${c.wpp||""}</option>`
+      ).join("");
+      // Guarda array global para lookup rápido
+      window._allClientsList = clients;
+    }
+  } catch(e) { console.warn("Erro ao carregar clientes para fiado:", e); }
+}
+
+function onFiadoNameInput() {
+  // Ao digitar, limpa resultado anterior para forçar nova busca
+  foundFiadoClient = null;
+  document.getElementById("fiado-client-found").style.display = "none";
+  document.getElementById("fiado-no-client").style.display   = "none";
+  document.getElementById("fiado-confirm-btn").style.display = "none";
 }
 
 function closeFiadoAuthModal() {
@@ -3553,19 +3593,31 @@ function closeFiadoAuthModal() {
 }
 
 async function searchClientForFiado() {
-  const wpp = document.getElementById("fiado-search-wpp").value.trim();
-  if (!wpp) { showToast("Informe o WhatsApp!"); return; }
+  const nome = (document.getElementById("fiado-search-nome").value || "").trim();
+  if (!nome) { showToast("Informe o nome do cliente!"); return; }
   try {
-    const snap = await FB.getDocs(FB.query(FB.collection(db,"clients"), FB.where("wpp","==",wpp)));
-    if (snap.empty) {
+    // Tenta usar a lista já carregada no datalist para lookup instantâneo
+    const cached = window._allClientsList || [];
+    const normalizar = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    let found = cached.find(c => normalizar(c.nome||"") === normalizar(nome));
+    // Se não achou exato, tenta parcial
+    if (!found) found = cached.find(c => normalizar(c.nome||"").includes(normalizar(nome)));
+    // Se ainda não achou, busca no Firestore
+    if (!found) {
+      const snap = await FB.getDocs(FB.collection(db,"clients"));
+      snap.forEach(d => {
+        const c = { id: d.id, ...d.data() };
+        if (!found && normalizar(c.nome||"").includes(normalizar(nome))) found = c;
+      });
+    }
+    if (!found) {
       document.getElementById("fiado-client-found").style.display = "none";
       document.getElementById("fiado-no-client").style.display   = "block";
       document.getElementById("fiado-confirm-btn").style.display = "none";
       foundFiadoClient = null;
       return;
     }
-    const cDoc = snap.docs[0];
-    foundFiadoClient = { id: cDoc.id, ...cDoc.data() };
+    foundFiadoClient = found;
     document.getElementById("fiado-found-name").textContent = foundFiadoClient.nome || "—";
     document.getElementById("fiado-found-wpp").textContent  = foundFiadoClient.wpp  || "—";
     document.getElementById("fiado-client-found").style.display = "block";
