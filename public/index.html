@@ -12,7 +12,7 @@
 <!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, query, where, orderBy, serverTimestamp }
+  import { initializeFirestore, collection, addDoc, getDocs, doc, updateDoc, query, where, orderBy, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -39,7 +39,9 @@
   // ────────────────────────────────────────────────────────────────────────────
 
   const app  = initializeApp(cfg.firebase);
-  const db   = getFirestore(app);
+  // Força HTTP long-polling para evitar erros QUIC em redes que bloqueiam o protocolo
+  // (resolve ERR_QUIC_PROTOCOL_ERROR e ERR_NAME_NOT_RESOLVED no Firestore)
+  const db = initializeFirestore(app, { experimentalForceLongPolling: true });
   const auth = getAuth(app);
 
   window._db        = db;
@@ -1030,47 +1032,43 @@ img { max-width: 100%; display: block; }
    RESPONSIVE — TABLET (≤900px)
 ═══════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
-  /* nav */
+  /* ── nav ── */
   .nav-links { display: none; }
-  .admin-link-btn { 
-    padding: 7px 10px;
-    border-color: rgba(255,255,255,0.3);
-  }
+  .admin-link-btn { padding: 7px 10px; border-color: rgba(255,255,255,0.3); }
   .admin-btn-text { display: none; }
   .admin-btn-icon { display: inline-block !important; }
   .cart-btn-text { display: none; }
   .cart-btn { padding: 8px 12px; gap: 6px; }
 
-  /* hero */
+  /* ── hero ── */
   .hero { flex-direction: column-reverse; padding: 40px 20px 36px; gap: 12px; text-align: center; }
   .hero-logo-side { max-width: 280px; padding: 0; }
   .hero-title { font-size: 36px; }
   .hero-sub { max-width: 100%; font-size: 14px; }
   .hero-btns { justify-content: center; }
   .hero-visual { width: 160px; height: 160px; font-size: 64px; }
-  .hero-logo-side { max-width: 240px; }
 
-  /* section */
+  /* ── sections ── */
   .section { padding: 36px 20px; }
   .section-title { font-size: 26px; }
 
-  /* products grid */
+  /* ── products ── */
   .products-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
 
-  /* how */
+  /* ── how ── */
   .how { padding: 48px 20px; }
   .steps { grid-template-columns: repeat(2, 1fr); gap: 20px; }
 
-  /* footer */
+  /* ── footer ── */
   .store-footer { flex-direction: column; align-items: flex-start; gap: 12px; padding: 24px 20px; }
 
-  /* checkout modal */
+  /* ── checkout modal ── */
   .checkout-grid { grid-template-columns: 1fr; }
   .order-summary { display: none; }
   .pay-options { grid-template-columns: 1fr 1fr 1fr; }
   .f2 { grid-template-columns: 1fr; }
 
-  /* admin sidebar — torna-se drawer lateral */
+  /* ── admin sidebar → drawer ── */
   .admin-sidebar {
     position: fixed; top: 0; left: -220px; z-index: 160;
     height: 100vh; transition: left .3s cubic-bezier(.4,0,.2,1);
@@ -1078,117 +1076,331 @@ img { max-width: 100%; display: block; }
   .admin-sidebar.open { left: 0; }
   .admin-main { width: 100%; }
 
-  /* admin topbar */
+  /* ── admin topbar ── */
   .hamburger { display: flex; }
   .admin-topbar { padding: 0 16px; }
 
-  /* kpi grid */
+  /* ── kpi grid ── */
   .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
-  /* two col */
+  /* ── two col ── */
   .two-col { grid-template-columns: 1fr; }
 
-  /* mkt grid */
+  /* ── mkt / recipe grids ── */
   .mkt-grid { grid-template-columns: 1fr; }
-
-  /* recipe grid */
   .recipe-grid { grid-template-columns: 1fr; }
 
-  /* prod admin grid */
+  /* ── prod admin grid ── */
   .prod-admin-grid { grid-template-columns: repeat(2, 1fr); }
 
-  /* clients/orders tables — scroll horizontal */
+  /* ── tables ── */
   .admin-card { overflow-x: auto; }
 
-  /* ai insights */
+  /* ── ai panel ── */
   .ai-insights-grid { grid-template-columns: 1fr; }
+
+  /* ── fiado ── */
+  .fiado-metrics { grid-template-columns: repeat(3,1fr); }
 }
 
 /* ═══════════════════════════════════════════════════════
-   RESPONSIVE — MOBILE (≤480px)
+   MOBILE TABLE → CARDS  (≤ 640 px)
+═══════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+
+  /* ── TABELA DE PEDIDOS → CARDS ── */
+  .orders-table { display: block; width: 100%; }
+  .orders-table thead { display: none; }
+  .orders-table tbody { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .orders-table tbody tr {
+    display: block;
+    background: var(--white);
+    border-radius: 12px;
+    padding: 14px 14px 10px;
+    border: 0.5px solid var(--border);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  }
+  .orders-table td {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    align-items: start;
+    gap: 4px;
+    padding: 5px 0;
+    border: none;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .orders-table td::before {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding-top: 2px;
+  }
+  .orders-table td:nth-child(1)::before { content: "Cliente"; }
+  .orders-table td:nth-child(2)::before { content: "Produtos"; }
+  .orders-table td:nth-child(3)::before { content: "Retirada"; }
+  .orders-table td:nth-child(4)::before { content: "Pagamento"; }
+  .orders-table td:nth-child(5)::before { content: "Total"; }
+  .orders-table td:nth-child(6)::before { content: "Status"; }
+  .orders-table td:nth-child(7) {
+    grid-template-columns: 1fr;
+    padding-top: 10px;
+    border-top: 0.5px solid var(--border);
+    margin-top: 6px;
+  }
+  .orders-table td:nth-child(7)::before { content: ""; display: none; }
+  .orders-table td:nth-child(7) > div {
+    display: flex; flex-direction: row; gap: 8px; align-items: center;
+  }
+  .orders-table .status-select { flex: 1; font-size: 12px; padding: 7px 8px; }
+
+  /* ── TABELA DE CLIENTES → CARDS ── */
+  .clients-table { display: block; width: 100%; }
+  .clients-table thead { display: none; }
+  .clients-table tbody { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .clients-table tbody tr {
+    display: grid;
+    grid-template-columns: 44px 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 4px 8px;
+    background: var(--white);
+    border-radius: 12px;
+    padding: 12px;
+    border: 0.5px solid var(--border);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+  }
+  /* avatar */
+  .clients-table td:nth-child(1) {
+    grid-row: 1 / 3; grid-column: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* nome */
+  .clients-table td:nth-child(2) {
+    grid-row: 1; grid-column: 2 / 4;
+    font-weight: 600; font-size: 14px; color: var(--teal-dark);
+  }
+  /* wpp */
+  .clients-table td:nth-child(3) {
+    grid-row: 2; grid-column: 2;
+    font-size: 12px; color: var(--muted);
+  }
+  /* aniversário */
+  .clients-table td:nth-child(4) {
+    grid-row: 2; grid-column: 3;
+    font-size: 12px;
+  }
+  /* pedidos + total + favorito + fiado – linha extra */
+  .clients-table td:nth-child(5),
+  .clients-table td:nth-child(6),
+  .clients-table td:nth-child(7),
+  .clients-table td:nth-child(8) {
+    grid-column: 1 / 4;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; padding: 2px 0;
+  }
+  .clients-table td:nth-child(5)::before { content: "📦 Pedidos: "; font-weight: 600; }
+  .clients-table td:nth-child(6)::before { content: "💰 Total: "; font-weight: 600; }
+  .clients-table td:nth-child(7)::before { content: "❤️ Favorito: "; font-weight: 600; }
+  .clients-table td:nth-child(8) { padding-top: 6px; border-top: 0.5px solid var(--border); margin-top: 4px; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE — MOBILE (≤ 480 px)
 ═══════════════════════════════════════════════════════ */
 @media (max-width: 480px) {
-  /* nav */
-  .store-nav { padding: 0 16px; height: 56px; }
-  .nav-brand { font-size: 18px; }
-  .nav-logo-img { width: 32px; height: 32px; font-size: 14px; }
-  .cart-btn { padding: 7px 12px 7px 10px; font-size: 12px; }
 
-  /* hero */
-  .hero { padding: 32px 16px 28px; }
-  .hero-title { font-size: 28px; }
+  /* ── NAV DA LOJA ── */
+  .store-nav { padding: 0 14px; height: 56px; }
+  .nav-brand { font-size: 17px; }
+  .nav-logo-img { width: 34px; height: 34px; }
+  .cart-btn { padding: 7px 11px 7px 9px; font-size: 12px; border-radius: 20px; }
+
+  /* ── HERO ── */
+  .hero { padding: 28px 16px 24px; }
+  .hero-title { font-size: 26px; }
   .hero-tag { font-size: 10px; }
-  .hero-visual { width: 120px; height: 120px; font-size: 48px; }
-  .hero-logo-side { max-width: 220px; padding: 0; }
-  .btn-hero-primary, .btn-hero-outline { padding: 12px 22px; font-size: 13px; }
+  .hero-visual { width: 110px; height: 110px; font-size: 44px; }
+  .hero-logo-side { max-width: 200px; padding: 0; }
+  .btn-hero-primary, .btn-hero-outline { padding: 12px 20px; font-size: 13px; }
 
-  /* section */
-  .section { padding: 28px 16px; }
+  /* ── SECTIONS ── */
+  .section { padding: 26px 14px; }
   .section-title { font-size: 22px; }
+  .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
 
-  /* products — 1 coluna */
-  .products-grid { grid-template-columns: 1fr; }
-  .prod-img { height: 160px; }
+  /* ── FILTER PILLS (scroll horizontal) ── */
+  .filter-row {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px; gap: 8px;
+    scrollbar-width: none;
+  }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-pill { flex-shrink: 0; padding: 8px 16px; }
 
-  /* how it works */
-  .steps { grid-template-columns: 1fr 1fr; gap: 16px; }
-  .step-num { width: 44px; height: 44px; font-size: 16px; }
-  .step-label { font-size: 13px; }
-  .step-desc { font-size: 11px; }
+  /* ── PRODUTOS (loja) — 2 colunas compactas ── */
+  .products-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .prod-img { height: 120px; font-size: 48px; }
+  .prod-body { padding: 11px 12px; }
+  .prod-name { font-size: 13px; }
+  .prod-desc { font-size: 11px; min-height: 30px; }
+  .prod-price { font-size: 18px; }
+  .qty-btn { width: 28px; height: 28px; font-size: 16px; }
 
-  /* cart drawer */
-  .cart-drawer { width: 100%; }
+  /* ── PE PRODUCTS (pronta entrega) ── */
+  #products-grid-pe { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+  .stock-badge-pe { font-size: 10px; padding: 3px 7px; }
 
-  /* checkout modal */
-  .modal-box { border-radius: 16px 16px 0 0; margin-top: auto; max-height: 95vh; }
+  /* ── ORDER TABS (Pronta Entrega / Encomenda) ── */
+  #otab-pe, #otab-enc { padding: 10px 16px; font-size: 13px; }
+
+  /* ── HOW IT WORKS ── */
+  .steps { grid-template-columns: 1fr 1fr; gap: 14px; }
+  .step-num { width: 40px; height: 40px; font-size: 15px; }
+  .step-label { font-size: 12px; }
+  .step-desc { font-size: 10px; }
+
+  /* ── CART DRAWER ── */
+  .cart-drawer { width: 100%; border-radius: 20px 20px 0 0; top: auto; }
+  .cart-drawer-header { padding: 16px 18px; }
+  .cart-items-list { padding: 12px 16px; }
+  .cart-footer-panel { padding: 14px 16px; }
+  .cart-item-thumb { width: 42px; height: 42px; font-size: 20px; border-radius: 8px; }
+  .btn-checkout { padding: 14px; font-size: 15px; border-radius: 14px; }
+
+  /* ── CHECKOUT MODAL ── */
+  .modal-box { border-radius: 20px 20px 0 0; margin-top: auto; max-height: 93vh; }
   .modal-overlay { align-items: flex-end; padding: 0; }
-  .pay-options { grid-template-columns: 1fr; gap: 8px; }
-  .step-bar { padding: 12px 16px; gap: 4px; }
-  .step-ln { max-width: 20px; }
+  .modal-header { padding: 16px 18px 14px; }
+  .modal-title { font-size: 15px; }
+  .step-bar { padding: 10px 14px; gap: 3px; }
+  .step-ln { max-width: 18px; }
   .step-n { font-size: 10px; }
-  .step-panel { padding: 18px 16px; }
+  .step-c { width: 24px; height: 24px; font-size: 11px; }
+  .step-panel { padding: 16px 16px 20px; }
   .modal-nav { flex-direction: column-reverse; gap: 8px; }
-  .modal-nav button { width: 100%; text-align: center; }
+  .modal-nav button { width: 100%; text-align: center; padding: 13px; border-radius: 12px; font-size: 14px; }
+  .pay-options { grid-template-columns: 1fr; gap: 8px; }
+  .pay-card { padding: 14px; display: flex; align-items: center; gap: 12px; text-align: left; }
+  .pay-card-icon { font-size: 22px; margin-bottom: 0; flex-shrink: 0; }
+  .fi { padding: 12px 13px; font-size: 15px; }  /* maior para toque */
+  .fg { margin-bottom: 14px; }
 
-  /* login */
-  .login-box { padding: 32px 24px; width: calc(100vw - 32px); }
+  /* ── LOGIN ── */
+  .login-box { padding: 32px 20px; width: calc(100vw - 32px); }
+  .login-fi { padding: 12px 14px; font-size: 15px; }
+  .login-btn { padding: 13px; font-size: 15px; }
 
-  /* admin */
-  .admin-content { padding: 16px; }
+  /* ── ADMIN LAYOUT ── */
+  .admin-content { padding: 14px 12px 80px; } /* padding-bottom para bottom nav */
+  .admin-topbar { height: 54px; padding: 0 14px; }
+  .admin-page-title { font-size: 15px; }
+  .btn-sm-primary, .btn-sm-outline { padding: 8px 14px; font-size: 12px; }
+
+  /* ── ADMIN KPI ── */
   .kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi-card { padding: 14px 12px; border-radius: 10px; }
   .kpi-val { font-size: 22px; }
-  .admin-topbar { height: 52px; }
-  .admin-page-title { font-size: 14px; }
+  .kpi-lbl { font-size: 10px; }
 
-  /* prod admin cards */
+  /* ── ADMIN STATUS FILTERS ── */
+  .status-filters {
+    display: flex; flex-wrap: nowrap; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; gap: 6px;
+    padding-bottom: 10px; margin-bottom: 12px;
+    scrollbar-width: none;
+  }
+  .status-filters::-webkit-scrollbar { display: none; }
+  .sf-btn { flex-shrink: 0; padding: 8px 14px; font-size: 12px; }
+
+  /* ── PROD ADMIN CARDS ── */
   .prod-admin-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .pac-img { height: 100px; font-size: 40px; }
   .pac-body { padding: 10px; }
   .pac-name { font-size: 12px; }
-  .pac-price { font-size: 16px; }
+  .pac-price { font-size: 15px; }
   .pac-actions { flex-direction: column; gap: 5px; }
-  .pac-btn { font-size: 11px; padding: 6px; }
+  .pac-btn { font-size: 11px; padding: 7px 6px; }
 
-  /* ai panel */
-  .ai-input-row { flex-direction: column; }
-  .ai-send { width: 100%; }
+  /* ── STOCK ADMIN CARDS ── */
+  .stock-admin-grid { display: grid; grid-template-columns: 1fr 1fr !important; gap: 10px; }
 
-  /* tables — scroll */
-  .clients-table, .orders-table, .ing-table { font-size: 12px; }
-  .orders-table th, .orders-table td { padding: 8px 10px; }
+  /* ── FIADO METRICS ── */
+  .fiado-metrics { grid-template-columns: 1fr !important; gap: 8px; }
+  .fm-val { font-size: 22px; }
 
-  /* product modal */
-  .prod-modal { max-width: 100%; border-radius: 16px 16px 0 0; }
+  /* ── AI PANEL ── */
+  .ai-panel { padding: 14px; }
+  .ai-insights-grid { grid-template-columns: 1fr; gap: 8px; }
+  .ai-input-row { flex-direction: column; gap: 8px; }
+  .ai-send { width: 100%; padding: 11px; }
+  .ai-input { padding: 11px 13px; font-size: 14px; }
+
+  /* ── RECIPE / MKT ── */
+  .recipe-grid { grid-template-columns: 1fr !important; }
+  .mkt-grid    { grid-template-columns: 1fr !important; }
+
+  /* ── PRODUCT MODAL ── */
+  .prod-modal { max-width: 100%; border-radius: 20px 20px 0 0; max-height: 92vh; }
   .prod-modal-overlay { align-items: flex-end; padding: 0; }
+  .pm-body { padding: 16px; }
 
-  /* ingredient modal */
-  .f2 { grid-template-columns: 1fr; }
+  /* ── CLIENT REG MODAL ── */
+  .client-reg-box { border-radius: 20px 20px 0 0; }
+  .client-reg-overlay { align-items: flex-end; padding: 0; }
+  .crb-body { padding: 18px 16px; }
 
-  /* store footer */
-  .store-footer { padding: 20px 16px; }
+  /* ── FIADO DETAIL GRID ── */
+  .fcc-detail-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
 
-  /* toast */
-  .toast { left: 16px; right: 16px; bottom: 16px; text-align: center; }
+  /* ── TOAST ── */
+  .toast { left: 12px; right: 12px; bottom: 76px; text-align: center; font-size: 13px; }
+
+  /* ── FOOTER ── */
+  .store-footer { padding: 20px 14px; }
+  .footer-brand { font-size: 16px; }
+}
+
+/* ── BOTTOM NAV (admin, mobile) ───────────────────────── */
+.mob-bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  z-index: 150;
+  background: #0D3D3D;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 6px 0 env(safe-area-inset-bottom, 6px);
+  gap: 0;
+  justify-content: space-around;
+  align-items: stretch;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
+}
+.mbn-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  padding: 6px 4px; background: none; border: none;
+  color: rgba(255,255,255,0.4); font-size: 10px;
+  cursor: pointer; position: relative;
+  transition: color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mbn-item i { font-size: 20px; }
+.mbn-item.active { color: var(--gold-light); }
+.mbn-badge {
+  position: absolute; top: 4px; right: calc(50% - 18px);
+  background: var(--gold); color: #fff;
+  font-size: 9px; font-weight: 700;
+  min-width: 16px; height: 16px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+}
+
+@media (max-width: 900px) {
+  /* mostra bottom nav somente dentro do admin */
+  .admin-page.active ~ .mob-bottom-nav,
+  .mob-bottom-nav.admin-visible {
+    display: flex;
+  }
 }
 </style>
 </head>
@@ -2479,6 +2691,7 @@ window.addEventListener("firebase-ready", () => {
       if (loginActive || onAdminRoute) {
         showPage("page-admin");
         loadDashboard();
+        showMobBottomNav(true);
       }
     }
   });
@@ -2533,6 +2746,7 @@ async function doLogin() {
     await FB.signInWithEmailAndPassword(auth, email, pass);
     showPage("page-admin");
     loadDashboard();
+    showMobBottomNav(true);
     // Ativa notificações push para o admin
     setupAdminPushNotifications();
   } catch (err) {
@@ -2575,6 +2789,7 @@ async function sendOrderNotifications(order) {
 async function doLogout() {
   try { await FB.signOut(auth); } catch {}
   showPage("page-store");
+  showMobBottomNav(false);
 }
 
 // ─── ADMIN SECTIONS ────────────────────────────────────
@@ -2583,6 +2798,7 @@ function showAdminSection(sec, el) {
   document.getElementById("sec-" + sec).classList.remove("hidden");
   document.querySelectorAll(".sb-item").forEach(i => i.classList.remove("active"));
   if (el) el.classList.add("active");
+  syncBottomNav(sec);
 
   if (sec === "dash")        loadDashboard();
   if (sec === "pedidos")     renderOrders();
@@ -2856,30 +3072,76 @@ async function submitClientRegister() {
   localStorage.setItem("panillo-cliente", JSON.stringify(clientData));
 
   // Salva / atualiza no Firebase
+  const wppNorm = String(wpp).replace(/\D/g,""); // normaliza para só dígitos
+  let firebaseSaved = false;
   try {
-    if (db && FB) {
-      const existing = await FB.getDocs(
-        FB.query(FB.collection(db, "clients"), FB.where("wpp", "==", wpp))
+    if (!db || !FB) throw new Error("Firebase não inicializado");
+
+    let existingDocs = null;
+    try {
+      existingDocs = await FB.getDocs(
+        FB.query(FB.collection(db, "clients"), FB.where("wpp", "==", wppNorm))
       );
-      if (existing.empty) {
-        await FB.addDoc(FB.collection(db, "clients"), {
-          ...clientData,
-          pedidos: 0,
-          totalGasto: 0,
-          favorito: "",
-          createdAt: FB.serverTimestamp()
-        });
-      } else {
-        await FB.updateDoc(existing.docs[0].ref, {
-          nome,
-          ...(email ? { email } : {}),
-          ...(bday  ? { bday  } : {}),
-          ...(obs   ? { obs   } : {})
-        });
+      if (existingDocs.empty && wppNorm !== wpp) {
+        existingDocs = await FB.getDocs(
+          FB.query(FB.collection(db, "clients"), FB.where("wpp", "==", wpp))
+        );
       }
+    } catch(queryErr) {
+      console.warn("Erro ao buscar cliente:", queryErr);
+      existingDocs = { empty: true };
+    }
+
+    if (existingDocs.empty) {
+      await FB.addDoc(FB.collection(db, "clients"), {
+        nome,
+        wpp:        wppNorm || wpp,
+        email:      email || "",
+        bday:       bday  || "",
+        obs:        obs   || "",
+        pedidos:    0,
+        totalGasto: 0,
+        favorito:   "",
+        createdAt:  FB.serverTimestamp()
+      });
+      firebaseSaved = true;
+      console.log("Novo cliente cadastrado via Cadastre-se:", nome);
+    } else {
+      await FB.updateDoc(existingDocs.docs[0].ref, {
+        nome,
+        wpp: wppNorm || wpp,
+        ...(email ? { email } : {}),
+        ...(bday  ? { bday  } : {}),
+        ...(obs   ? { obs   } : {})
+      });
+      firebaseSaved = true;
+      console.log("Cliente atualizado via Cadastre-se:", nome);
     }
   } catch(e) {
-    console.warn("Firebase client save:", e);
+    console.error("Erro ao salvar cadastro:", e);
+    // Fallback: tenta inserir diretamente sem verificar duplicata
+    try {
+      if (db && FB) {
+        await FB.addDoc(FB.collection(db, "clients"), {
+          nome,
+          wpp:        wppNorm || wpp,
+          email:      email || "",
+          bday:       bday  || "",
+          obs:        obs   || "",
+          pedidos:    0,
+          totalGasto: 0,
+          favorito:   "",
+          createdAt:  FB.serverTimestamp(),
+          _fallback:  true
+        });
+        firebaseSaved = true;
+        console.log("Cliente salvo via fallback:", nome);
+      }
+    } catch(e2) { console.error("Fallback também falhou:", e2); }
+  }
+  if (!firebaseSaved) {
+    // Mesmo sem Firebase, o cadastro local funciona para o fluxo de compra
+    console.warn("Cadastro salvo apenas localmente para:", nome);
   }
 
   btn.textContent = "Salvar cadastro";
@@ -3215,6 +3477,7 @@ async function loadOrders() {
   try { allOrders = await fbGet("orders"); } catch { allOrders = []; }
   const badge = allOrders.filter(o => o.status === "pendente").length;
   document.getElementById("badge-pedidos").textContent = badge;
+  updateMbnBadge(badge);
 }
 
 function renderOrders() {
@@ -3254,6 +3517,7 @@ async function updateOrderStatus(id, newStatus) {
   allOrders = allOrders.map(o => o.id === id ? {...o, status: newStatus} : o);
   const badge = allOrders.filter(o => o.status === "pendente").length;
   document.getElementById("badge-pedidos").textContent = badge;
+  updateMbnBadge(badge);
 
   // ── Baixa o estoque de Pronta Entrega ao marcar como Entregue ──────────────
   if (newStatus === "entregue" && prevStatus !== "entregue" &&
@@ -4604,6 +4868,40 @@ function toggleStoreMobileMenu() {
   burger.classList.toggle("open", !isOpen);
 }
 
+// ─── MOBILE BOTTOM NAV ─────────────────────────────────
+function mbnGo(sec, el) {
+  // Map section to sidebar item for active state
+  const sidebarMap = {
+    'dash':     document.querySelector('.sb-item:nth-child(1)'),
+    'pedidos':  document.querySelector('[onclick*="pedidos"]'),
+    'clientes': document.querySelector('[onclick*="clientes"]'),
+    'estoque':  document.querySelector('[onclick*="estoque"]')
+  };
+  showAdminSection(sec, sidebarMap[sec]);
+  // Update bottom nav active state
+  document.querySelectorAll('.mbn-item').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function syncBottomNav(sec) {
+  const map = { dash:'mbn-dash', pedidos:'mbn-pedidos', clientes:'mbn-clientes', estoque:'mbn-estoque' };
+  if (map[sec]) {
+    document.querySelectorAll('.mbn-item').forEach(b => b.classList.remove('active'));
+    const el = document.getElementById(map[sec]);
+    if (el) el.classList.add('active');
+  }
+}
+
+function showMobBottomNav(show) {
+  const nav = document.getElementById('mob-bottom-nav');
+  if (nav) nav.style.display = show ? 'flex' : 'none';
+}
+
+function updateMbnBadge(count) {
+  const b = document.getElementById('mbn-badge');
+  if (b) { b.textContent = count; b.style.display = count > 0 ? 'flex' : 'none'; }
+}
+
 function toggleAdminSidebar() {
   const sidebar = document.querySelector(".admin-sidebar");
   const overlay = document.getElementById("admin-mob-overlay");
@@ -4891,5 +5189,28 @@ document.addEventListener("DOMContentLoaded", () => {
   #depoimentos-grid { grid-template-columns: 1fr; }
 }
 </style>
+
+<!-- ═══════════════════════════════════════════════════
+     MOBILE BOTTOM NAV (admin)
+════════════════════════════════════════════════════ -->
+<nav class="mob-bottom-nav" id="mob-bottom-nav">
+  <button class="mbn-item active" id="mbn-dash"    onclick="mbnGo('dash',this)">
+    <i class="ti ti-layout-dashboard"></i><span>Dashboard</span>
+  </button>
+  <button class="mbn-item" id="mbn-pedidos" onclick="mbnGo('pedidos',this)">
+    <i class="ti ti-clipboard-list"></i><span>Pedidos</span>
+    <span class="mbn-badge" id="mbn-badge">0</span>
+  </button>
+  <button class="mbn-item" id="mbn-clientes" onclick="mbnGo('clientes',this)">
+    <i class="ti ti-users"></i><span>Clientes</span>
+  </button>
+  <button class="mbn-item" id="mbn-estoque"  onclick="mbnGo('estoque',this)">
+    <i class="ti ti-package"></i><span>Estoque</span>
+  </button>
+  <button class="mbn-item" id="mbn-mais"     onclick="toggleAdminSidebar()">
+    <i class="ti ti-menu-2"></i><span>Mais</span>
+  </button>
+</nav>
+
 </body>
 </html>
