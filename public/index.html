@@ -1402,79 +1402,6 @@ img { max-width: 100%; display: block; }
     display: flex;
   }
 }
-
-/* ══════════════════════════════════════════════════════
-   GATEWAY MODAL — identificação antes do checkout
-══════════════════════════════════════════════════════ */
-.gw-overlay {
-  position: fixed; inset: 0; z-index: 2100;
-  background: rgba(0,0,0,.45); backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
-  opacity: 0; pointer-events: none; transition: opacity .25s;
-}
-.gw-overlay.open { opacity: 1; pointer-events: all; }
-.gw-box {
-  background: var(--surface, #fff);
-  border-radius: 20px;
-  padding: 36px 32px 28px;
-  width: 100%; max-width: 420px;
-  box-shadow: 0 24px 60px rgba(0,0,0,.18);
-  position: relative;
-  transform: translateY(20px); transition: transform .25s;
-}
-.gw-overlay.open .gw-box { transform: translateY(0); }
-.gw-close {
-  position: absolute; top: 14px; right: 14px;
-  background: none; border: none; cursor: pointer;
-  font-size: 20px; color: var(--muted, #888);
-  width: 32px; height: 32px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  transition: background .15s;
-}
-.gw-close:hover { background: rgba(0,0,0,.06); }
-.gw-icon { font-size: 40px; margin-bottom: 12px; }
-.gw-title { font-size: 20px; font-weight: 600; color: var(--teal-dark, #0F4A4A); margin-bottom: 6px; }
-.gw-sub   { font-size: 13px; color: var(--muted, #888); margin-bottom: 24px; }
-.gw-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
-.gw-choice {
-  border: 2px solid var(--border, #e5e5e5);
-  border-radius: 14px; padding: 18px 14px; text-align: center;
-  cursor: pointer; transition: border-color .15s, background .15s;
-  background: transparent;
-}
-.gw-choice:hover { border-color: var(--teal, #1A6B6B); background: rgba(26,107,107,.04); }
-.gw-choice .gw-c-icon { font-size: 28px; margin-bottom: 8px; }
-.gw-choice .gw-c-label { font-size: 14px; font-weight: 600; color: var(--teal-dark, #0F4A4A); }
-.gw-choice .gw-c-sub   { font-size: 11px; color: var(--muted, #888); margin-top: 3px; }
-
-/* ── WPP lookup step ── */
-.gw-lookup { display: none; }
-.gw-lookup.visible { display: block; }
-.gw-back {
-  background: none; border: none; cursor: pointer;
-  font-size: 13px; color: var(--teal, #1A6B6B); font-weight: 500;
-  padding: 0; margin-bottom: 16px; display: flex; align-items: center; gap: 4px;
-}
-.gw-found-banner {
-  display: flex; align-items: center; gap: 12px;
-  background: #EBF5F2; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px;
-}
-.gw-found-avatar {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: var(--teal-dark, #0F4A4A); color: #fff;
-  font-size: 16px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.gw-found-name  { font-size: 15px; font-weight: 600; color: var(--teal-dark, #0F4A4A); }
-.gw-found-sub   { font-size: 12px; color: var(--muted, #888); margin-top: 2px; }
-.gw-not-found {
-  background: #FFF4E6; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px;
-  font-size: 13px; color: #8B5E00;
-}
-@media (max-width: 480px) {
-  .gw-box { padding: 28px 18px 22px; }
-  .gw-choices { grid-template-columns: 1fr; }
-}
 </style>
 </head>
 <body>
@@ -2775,6 +2702,15 @@ window.addEventListener("firebase-ready", () => {
   loadDashboard();
   loadStock();
   loadFiadoAccounts();
+  // Após carregar pedidos e estoque, reconcilia qualquer desconto pendente
+  Promise.all([
+    fbGet("orders").catch(() => []),
+    fbGet("stock").catch(() => [])
+  ]).then(([orders, stockDocs]) => {
+    // allOrders e allStock já foram populados pelas funções acima;
+    // aguarda um tick para garantir que estejam prontos antes de reconciliar
+    setTimeout(reconcileStock, 1500);
+  });
 });
 
 async function fbAdd(col, data) {
@@ -2924,10 +2860,7 @@ function renderPEProducts() {
   }
   grid.innerHTML = peProds.map(p => {
     const s = allStock[p.id];
-    const totalQty = s ? (s.qty || 0) : 0;
-    // Subtract what's already in cart
-    const cartQty = (cart[p.id + "_pe"] || {}).qty || 0;
-    const qty = Math.max(0, totalQty - cartQty);
+    const qty = s ? (s.qty || 0) : 0;
     const isLow = qty > 0 && qty <= 3;
     const badgeClass = qty === 0 ? "stock-zero" : isLow ? "stock-low" : "stock-ok";
     const badgeIcon  = qty === 0 ? "ti-x" : isLow ? "ti-alert-triangle" : "ti-circle-check";
@@ -2937,7 +2870,7 @@ function renderPEProducts() {
       : p.categoria === "combo"
         ? "background:linear-gradient(135deg,#FDF6E8,#F5E0B0);"
         : "background:linear-gradient(135deg,#FDF0DC,#F5E0B0);";
-    const cardOp = totalQty === 0 ? "opacity:0.55;" : "";
+    const cardOp = qty === 0 ? "opacity:0.55;" : "";
     return `<div class="product-card" style="${cardOp}" id="pe-card-${p.id}">
       <div class="prod-img ${p.categoria}" style="${imgBg}">
         <span style="font-size:72px;">${p.emoji || "🍪"}</span>
@@ -2948,9 +2881,9 @@ function renderPEProducts() {
         <div class="stock-badge-pe ${badgeClass}"><i class="ti ${badgeIcon}" style="font-size:11px;"></i> ${badgeText}</div>
         <div class="prod-footer">
           <div class="prod-price">R$ ${Number(p.preco).toFixed(2).replace(".",",")}<small>/un.</small></div>
-          ${totalQty > 0 ? `<div class="qty-ctrl">
+          ${qty > 0 ? `<div class="qty-ctrl">
             <button class="qty-btn" onclick="changePEQty('${p.id}',-1)">−</button>
-            <span class="qty-num" id="pe-qty-${p.id}">${cartQty}</span>
+            <span class="qty-num" id="pe-qty-${p.id}">0</span>
             <button class="qty-btn" onclick="changePEQty('${p.id}',1)">+</button>
           </div>` : `<button disabled style="background:rgba(0,0,0,0.06);color:#999;border:none;padding:8px 14px;border-radius:20px;font-size:12px;">Esgotado</button>`}
         </div>
@@ -2961,14 +2894,14 @@ function renderPEProducts() {
 
 function changePEQty(prodId, delta) {
   const s = allStock[prodId];
-  const totalQty = s ? (s.qty || 0) : 0;
+  const maxQty = s ? (s.qty || 0) : 0;
   const qtyEl = document.getElementById("pe-qty-" + prodId);
   if (!qtyEl) return;
   const prod = allProducts.find(p => p.id === prodId);
   if (!prod) return;
 
   const current = parseInt(qtyEl.textContent) || 0;
-  const newQty = Math.min(Math.max(0, current + delta), totalQty);
+  const newQty = Math.min(Math.max(0, current + delta), maxQty);
   qtyEl.textContent = newQty;
 
   const key = prodId + "_pe";
@@ -2978,19 +2911,6 @@ function changePEQty(prodId, delta) {
     cart[key] = { prod: { ...prod, _pe: true }, qty: newQty };
   }
   updateCartUI();
-  // Update stock badge for this card to show remaining (totalQty - cartQty)
-  const card = document.getElementById("pe-card-" + prodId);
-  if (card) {
-    const avail = Math.max(0, totalQty - newQty);
-    const isLow  = avail > 0 && avail <= 3;
-    const badgeEl = card.querySelector(".stock-badge-pe");
-    if (badgeEl) {
-      badgeEl.className = "stock-badge-pe " + (avail === 0 ? "stock-zero" : isLow ? "stock-low" : "stock-ok");
-      const icon = avail === 0 ? "ti-x" : isLow ? "ti-alert-triangle" : "ti-circle-check";
-      const text = avail === 0 ? "Esgotado" : `${avail} unid.`;
-      badgeEl.innerHTML = `<i class="ti ${icon}" style="font-size:11px;"></i> ${text}`;
-    }
-  }
 }
 
 function renderStoreProducts(filter) {
@@ -3303,122 +3223,6 @@ function openCheckout() {
   if (Object.keys(cart).length === 0) { showToast("Adicione produtos ao carrinho!"); return; }
   document.getElementById("cart-overlay").classList.remove("open");
   document.getElementById("cart-drawer").classList.remove("open");
-  // Open identification gateway instead of checkout directly
-  openGateway();
-}
-
-// ─── GATEWAY: identificação pré-checkout ──────────────────
-let _gwFoundClient = null; // client doc found in Firebase during lookup
-
-function openGateway() {
-  _gwFoundClient = null;
-  document.getElementById("gw-step-choose").style.display = "";
-  document.getElementById("gw-step-lookup").classList.remove("visible");
-  document.getElementById("gw-wpp-input").value = "";
-  document.getElementById("gw-result").style.display = "none";
-  document.getElementById("gw-result").innerHTML = "";
-  document.getElementById("gw-confirm-btn").style.display = "none";
-  document.getElementById("gw-modal").classList.add("open");
-}
-
-function closeGateway() {
-  document.getElementById("gw-modal").classList.remove("open");
-}
-
-function gwChooseSim() {
-  document.getElementById("gw-step-choose").style.display = "none";
-  document.getElementById("gw-step-lookup").classList.add("visible");
-  setTimeout(() => document.getElementById("gw-wpp-input").focus(), 100);
-}
-
-function gwChooseNao() {
-  closeGateway();
-  // Clear saved data so checkout opens with empty form
-  _openCheckoutWithClient(null);
-}
-
-function gwBack() {
-  document.getElementById("gw-step-choose").style.display = "";
-  document.getElementById("gw-step-lookup").classList.remove("visible");
-  _gwFoundClient = null;
-}
-
-function gwWppMask(el) {
-  let v = el.value.replace(/\D/g, "").substring(0, 11);
-  el.value = v;
-}
-
-async function gwSearch() {
-  const raw = document.getElementById("gw-wpp-input").value.replace(/\D/g, "");
-  if (raw.length < 8) { showToast("Digite um número válido!"); return; }
-  const btn = document.getElementById("gw-search-btn");
-  btn.textContent = "…"; btn.disabled = true;
-  const resultEl = document.getElementById("gw-result");
-  const confirmBtn = document.getElementById("gw-confirm-btn");
-  resultEl.style.display = "none";
-  confirmBtn.style.display = "none";
-  _gwFoundClient = null;
-  try {
-    if (!db || !FB) throw new Error("Firebase não pronto");
-    // Try exact match + without country code variations
-    const variants = [raw];
-    if (raw.startsWith("55")) variants.push(raw.slice(2));
-    else variants.push("55" + raw);
-    let found = null;
-    for (const v of variants) {
-      const snap = await FB.getDocs(
-        FB.query(FB.collection(db, "clients"), FB.where("wpp", "==", v))
-      );
-      if (!snap.empty) { found = { id: snap.docs[0].id, ...snap.docs[0].data() }; break; }
-    }
-    if (found) {
-      _gwFoundClient = found;
-      const initials = (found.nome || "?").substring(0, 2).toUpperCase();
-      resultEl.innerHTML = `
-        <div class="gw-found-banner">
-          <div class="gw-found-avatar">${initials}</div>
-          <div>
-            <div class="gw-found-name">Olá, ${found.nome.split(" ")[0]}! 👋</div>
-            <div class="gw-found-sub">Encontramos seu cadastro. Confirme para continuar.</div>
-          </div>
-        </div>`;
-      confirmBtn.style.display = "";
-    } else {
-      resultEl.innerHTML = `
-        <div class="gw-not-found">
-          ❌ Nenhum cadastro encontrado para este número.<br>
-          <span style="display:block;margin-top:6px;font-size:12px;">Verifique o número ou clique em <strong>"Não tenho"</strong> para se cadastrar agora.</span>
-        </div>`;
-      confirmBtn.style.display = "none";
-    }
-    resultEl.style.display = "";
-  } catch(e) {
-    resultEl.innerHTML = `<div class="gw-not-found">⚠️ Erro ao buscar. Tente novamente.</div>`;
-    resultEl.style.display = "";
-    console.warn("gwSearch error:", e);
-  }
-  btn.textContent = "Buscar"; btn.disabled = false;
-}
-
-function gwConfirm() {
-  if (!_gwFoundClient) return;
-  closeGateway();
-  _openCheckoutWithClient(_gwFoundClient);
-}
-
-function _openCheckoutWithClient(client) {
-  // Pre-fill form with found/saved data
-  if (client) {
-    localStorage.setItem("panillo-cliente", JSON.stringify({
-      nome: client.nome || "", wpp: client.wpp || "",
-      email: client.email || "", bday: client.bday || "", obs: client.obs || ""
-    }));
-  }
-  // Now open actual checkout
-  _doOpenCheckout();
-}
-
-function _doOpenCheckout() {
   currentStep = 1;
   renderStepBar(1);
   document.querySelectorAll(".step-panel").forEach(p => p.classList.remove("active"));
@@ -3446,19 +3250,16 @@ function _doOpenCheckout() {
       </div>`;
   } else {
     document.getElementById("ret-banner-wrap").innerHTML = "";
-    // Clear form fields for new user
-    ["f-nome","f-wpp","f-email","f-bday","f-obs"].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = "";
-    });
   }
   // Set min date based on order type
   const dateInput = document.getElementById("f-data");
   const dateBlock = dateInput.closest(".fg");
   if (isPE) {
+    // PE: hide date field, set today
     if (dateBlock) dateBlock.style.display = "none";
     dateInput.value = new Date().toISOString().split("T")[0];
   } else {
+    // Encomenda: min 48h
     if (dateBlock) dateBlock.style.display = "";
     const minDate = new Date(); minDate.setDate(minDate.getDate()+2);
     dateInput.min = minDate.toISOString().split("T")[0];
@@ -3468,12 +3269,8 @@ function _doOpenCheckout() {
   const savedClient = JSON.parse(localStorage.getItem("panillo-cliente") || "{}");
   const fiadoCard = document.getElementById("pay-fiado-card");
   if (fiadoCard && savedClient.wpp) {
-    const wppNorm = String(savedClient.wpp).replace(/\D/g,"");
-    const hasCredit = allFiadoAccounts.some(a =>
-      String(a.clientWpp).replace(/\D/g,"") === wppNorm && a.autorizado);
+    const hasCredit = allFiadoAccounts.some(a => a.clientWpp === savedClient.wpp && a.autorizado);
     fiadoCard.style.display = hasCredit ? "" : "none";
-  } else if (fiadoCard) {
-    fiadoCard.style.display = "none";
   }
   document.getElementById("checkout-modal").classList.add("open");
 }
@@ -3497,9 +3294,7 @@ async function goStep(n) {
     // Show fiado option if client has credit
     const fiadoCard = document.getElementById("pay-fiado-card");
     if (fiadoCard) {
-      const wppNorm = String(wpp).replace(/\D/g,"");
-      const hasCredit = allFiadoAccounts.some(a =>
-        String(a.clientWpp).replace(/\D/g,"") === wppNorm && a.autorizado);
+      const hasCredit = allFiadoAccounts.some(a => a.clientWpp === wpp && a.autorizado);
       fiadoCard.style.display = hasCredit ? "" : "none";
     }
     renderOrderSummary("order-summary-2");
@@ -3753,6 +3548,9 @@ async function updateOrderStatus(id, newStatus) {
         }
       } catch(e) { console.warn("Erro ao baixar estoque:", e); }
     }
+    // Marca pedido como já contabilizado no estoque (evita dupla contagem)
+    try { await fbUpdate("orders", id, { _stockDecremented: true }); } catch(e) {}
+    allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: true } : o);
     if (stockChanged) {
       renderStockAdmin();
       renderPEProducts();
@@ -3857,6 +3655,64 @@ async function loadStock() {
     docs.forEach(d => { allStock[d.prodId] = { id: d.id, qty: d.qty || 0, ativo: d.ativo || false }; });
   } catch { allStock = {}; }
   renderPEProducts();
+}
+
+// ── Reconcilia estoque com pedidos já entregues não contabilizados ──────────
+// Roda uma vez ao iniciar o painel. Varre todos os pedidos pronta-entrega com
+// status "entregue" que ainda não têm _stockDecremented:true e aplica os
+// descontos que ficaram para trás (reload de página, troca de sessão, etc.).
+async function reconcileStock() {
+  if (!db || !FB) return;
+  const pending = (allOrders || []).filter(o =>
+    o.tipo === "pronta-entrega" &&
+    o.status === "entregue" &&
+    !o._stockDecremented
+  );
+  if (pending.length === 0) return;
+
+  console.log(`[reconcile] ${pending.length} pedido(s) PE entregue(s) sem desconto de estoque. Corrigindo…`);
+
+  // Calcula o delta total por produto de uma vez
+  const deltas = {}; // { prodId: totalQtyToSubtract }
+  for (const order of pending) {
+    for (const item of (order.itens || [])) {
+      if (!item.prodId) continue;
+      deltas[item.prodId] = (deltas[item.prodId] || 0) + (item.qty || 0);
+    }
+  }
+
+  // Aplica os deltas no Firebase e em allStock
+  let changed = false;
+  for (const [prodId, delta] of Object.entries(deltas)) {
+    const s = allStock[prodId] || {};
+    const newQty = Math.max(0, (s.qty || 0) - delta);
+    allStock[prodId] = { ...s, qty: newQty };
+    try {
+      const stockDocs = await FB.getDocs(
+        FB.query(FB.collection(db, "stock"), FB.where("prodId", "==", prodId))
+      );
+      if (!stockDocs.empty) {
+        await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
+        const nome = allProducts.find(p => p.id === prodId)?.nome || prodId;
+        console.log(`[reconcile] ${nome}: -${delta} → ${newQty} unid.`);
+        changed = true;
+      }
+    } catch(e) { console.warn("[reconcile] Erro ao atualizar estoque:", e); }
+  }
+
+  // Marca todos os pedidos pendentes como contabilizados
+  for (const order of pending) {
+    try { await fbUpdate("orders", order.id, { _stockDecremented: true }); } catch(e) {}
+  }
+  allOrders = allOrders.map(o =>
+    pending.some(p => p.id === o.id) ? { ...o, _stockDecremented: true } : o
+  );
+
+  if (changed) {
+    console.log("[reconcile] Estoque corrigido com sucesso.");
+    renderStockAdmin();
+    renderPEProducts();
+  }
 }
 
 function renderStockAdmin() {
@@ -5425,50 +5281,6 @@ document.addEventListener("DOMContentLoaded", () => {
     <i class="ti ti-menu-2"></i><span>Mais</span>
   </button>
 </nav>
-
-<!-- ════════════════════════════════════════════════════
-     GATEWAY MODAL — identificação pré-checkout
-════════════════════════════════════════════════════ -->
-<div class="gw-overlay" id="gw-modal">
-  <div class="gw-box">
-    <button class="gw-close" onclick="closeGateway()"><i class="ti ti-x"></i></button>
-
-    <!-- Step 1: escolha -->
-    <div id="gw-step-choose">
-      <div class="gw-icon">🛍️</div>
-      <div class="gw-title">Finalizar pedido</div>
-      <div class="gw-sub">Você já tem cadastro na Panillo?</div>
-      <div class="gw-choices">
-        <button class="gw-choice" onclick="gwChooseSim()">
-          <div class="gw-c-icon">✅</div>
-          <div class="gw-c-label">Sim, tenho</div>
-          <div class="gw-c-sub">Entrar com meu WhatsApp</div>
-        </button>
-        <button class="gw-choice" onclick="gwChooseNao()">
-          <div class="gw-c-icon">🆕</div>
-          <div class="gw-c-label">Não tenho</div>
-          <div class="gw-c-sub">Fazer meu cadastro agora</div>
-        </button>
-      </div>
-    </div>
-
-    <!-- Step 2: busca por WhatsApp -->
-    <div id="gw-step-lookup" class="gw-lookup">
-      <button class="gw-back" onclick="gwBack()"><i class="ti ti-arrow-left"></i> Voltar</button>
-      <div class="gw-title">Qual é o seu WhatsApp?</div>
-      <div class="gw-sub" style="margin-bottom:16px;">Digite o número cadastrado para identificarmos você.</div>
-      <div style="display:flex;gap:10px;margin-bottom:16px;">
-        <input class="fi" id="gw-wpp-input" type="tel" placeholder="85 9 9999-9999"
-          style="flex:1;" oninput="gwWppMask(this)" onkeydown="if(event.key==='Enter')gwSearch()">
-        <button class="btn-sm-primary" onclick="gwSearch()" id="gw-search-btn"
-          style="white-space:nowrap;padding:0 18px;">Buscar</button>
-      </div>
-      <div id="gw-result" style="display:none;"></div>
-      <button class="btn-sm-primary" id="gw-confirm-btn" onclick="gwConfirm()"
-        style="width:100%;display:none;margin-top:4px;">Continuar com esses dados →</button>
-    </div>
-  </div>
-</div>
 
 </body>
 </html>
