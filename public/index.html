@@ -12,7 +12,7 @@
 <!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc, query, where, orderBy, serverTimestamp }
+  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, query, where, orderBy, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -47,7 +47,7 @@
   window._wppNumber = cfg.wppNumber;
   window._pixKey    = cfg.pixKey;
   window._fbModules = {
-    collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc,
+    collection, addDoc, getDocs, doc, updateDoc,
     query, where, orderBy, serverTimestamp,
     signInWithEmailAndPassword, signOut, onAuthStateChanged
   };
@@ -2858,24 +2858,20 @@ async function submitClientRegister() {
   // Salva / atualiza no Firebase
   try {
     if (db && FB) {
-      const wppId  = wpp.replace(/\D/g, "");
-      const docRef = FB.doc(db, "clients", wppId);
-      const snap   = await FB.getDoc(docRef);
-
-      if (!snap.exists()) {
-        await FB.setDoc(docRef, {
+      const existing = await FB.getDocs(
+        FB.query(FB.collection(db, "clients"), FB.where("wpp", "==", wpp))
+      );
+      if (existing.empty) {
+        await FB.addDoc(FB.collection(db, "clients"), {
           ...clientData,
-          pedidos:    0,
+          pedidos: 0,
           totalGasto: 0,
-          favorito:   "",
-          createdAt:  FB.serverTimestamp()
+          favorito: "",
+          createdAt: FB.serverTimestamp()
         });
       } else {
-        const data = snap.data();
-        await FB.setDoc(docRef, {
-          ...data,
+        await FB.updateDoc(existing.docs[0].ref, {
           nome,
-          wpp,
           ...(email ? { email } : {}),
           ...(bday  ? { bday  } : {}),
           ...(obs   ? { obs   } : {})
@@ -2897,12 +2893,6 @@ async function submitClientRegister() {
 
   // Atualiza botão da nav
   updateNavClientButton(nome);
-
-  // Atualiza lista no admin se a aba estiver visível
-  const secClientes = document.getElementById("sec-clientes");
-  if (secClientes && !secClientes.classList.contains("hidden")) {
-    renderClients();
-  }
 
   // Verifica se tem fiado ativo e mostra opção
   checkFiadoForClient(wpp);
@@ -3030,39 +3020,6 @@ async function goStep(n) {
       obs:   document.getElementById("f-obs").value.trim()
     };
     localStorage.setItem("panillo-cliente", JSON.stringify(client));
-
-    // Sincroniza com Firebase já neste step — sem query, usa wpp como ID
-    if (db && FB) {
-      try {
-        const wppId  = wpp.replace(/\D/g, "");
-        const docRef = FB.doc(db, "clients", wppId);
-        const snap   = await FB.getDoc(docRef);
-        if (!snap.exists()) {
-          await FB.setDoc(docRef, {
-            ...client,
-            pedidos:    0,
-            totalGasto: 0,
-            favorito:   "",
-            createdAt:  FB.serverTimestamp()
-          });
-        } else {
-          const data = snap.data();
-          await FB.setDoc(docRef, {
-            ...data,
-            nome, wpp,
-            ...(client.email ? { email: client.email } : {}),
-            ...(client.bday  ? { bday:  client.bday  } : {}),
-            ...(client.obs   ? { obs:   client.obs   } : {})
-          });
-        }
-        // Atualiza lista no admin se a aba estiver visível
-        const secClientes = document.getElementById("sec-clientes");
-        if (secClientes && !secClientes.classList.contains("hidden")) {
-          renderClients();
-        }
-      } catch(e) { console.warn("goStep Firebase sync:", e); }
-    }
-
     // Show fiado option if client has credit
     const fiadoCard = document.getElementById("pay-fiado-card");
     if (fiadoCard) {
@@ -3115,23 +3072,8 @@ async function submitOrder() {
     await saveClientToFirebase(client, order);
     // ─── Notificações ───────────────────────────
     sendOrderNotifications(order).catch(e => console.warn("Notify error:", e));
-    // Decrement PE stock
-    if (isPE) {
-      for (const item of items) {
-        if (item.prod._pe && item.prod.id) {
-          const s = allStock[item.prod.id] || {};
-          const newQty = Math.max(0, (s.qty || 0) - item.qty);
-          allStock[item.prod.id] = { ...s, qty: newQty };
-          try {
-            const stockDocs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prod.id)));
-            if (!stockDocs.empty) {
-              await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
-            }
-          } catch(e) { console.warn("stock update err", e); }
-        }
-      }
-      renderPEProducts();
-    }
+    // Nota: o estoque de Pronta Entrega é baixado quando o pedido for marcado como "Entregue"
+    // para garantir precisão e refletir a baixa real no painel do admin.
     // Handle fiado payment
     if (selectedPay === "fiado") {
       await addFiadoDebt(client, order);
@@ -3167,46 +3109,94 @@ async function submitOrder() {
 }
 
 async function saveClientToFirebase(client, order) {
-  // Aborta se não tiver os campos obrigatórios
-  if (!client || !client.wpp || !client.nome) {
-    console.warn("saveClientToFirebase: cliente sem wpp/nome, ignorando.");
+  // Garante que temos nome e wpp antes de qualquer operação
+  if (!client || !client.nome || !client.wpp) {
+    console.warn("saveClientToFirebase: dados do cliente incompletos", client);
     return;
   }
+  const wppNorm = String(client.wpp).replace(/\D/g,""); // normaliza para só dígitos
   try {
-    // Usa o wpp como ID do documento — elimina a necessidade de query com índice
-    const wppId  = client.wpp.replace(/\D/g, ""); // apenas dígitos como ID
-    const docRef = FB.doc(db, "clients", wppId);
-    const snap   = await FB.getDoc(docRef);
+    if (!db || !FB) throw new Error("Firebase não inicializado");
 
-    if (!snap.exists()) {
-      await FB.setDoc(docRef, {
-        ...client,
+    // Tenta buscar por wpp normalizado e também pelo valor original
+    let existingDocs = null;
+    try {
+      existingDocs = await FB.getDocs(
+        FB.query(FB.collection(db,"clients"), FB.where("wpp","==",wppNorm))
+      );
+      // Se não achou pelo normalizado, tenta pelo original
+      if (existingDocs.empty && wppNorm !== client.wpp) {
+        existingDocs = await FB.getDocs(
+          FB.query(FB.collection(db,"clients"), FB.where("wpp","==",client.wpp))
+        );
+      }
+    } catch(queryErr) {
+      console.warn("Erro ao buscar cliente:", queryErr);
+      // Se a query falhou, tenta inserir diretamente
+      existingDocs = { empty: true };
+    }
+
+    // Calcula o produto mais pedido (favorito)
+    const novoFavorito = order.itens?.[0]?.nome || "";
+
+    if (existingDocs.empty) {
+      // Novo cliente — cadastra com todos os dados do pedido
+      await FB.addDoc(FB.collection(db,"clients"), {
+        nome:       client.nome,
+        wpp:        wppNorm || client.wpp,
+        email:      client.email || "",
+        bday:       client.bday  || "",
+        obs:        client.obs   || "",
         pedidos:    1,
-        totalGasto: order.total,
-        favorito:   order.itens[0]?.nome || "",
+        totalGasto: Number(order.total) || 0,
+        favorito:   novoFavorito,
         createdAt:  FB.serverTimestamp()
       });
+      console.log("Novo cliente cadastrado:", client.nome);
     } else {
-      const data = snap.data();
-      await FB.setDoc(docRef, {
-        ...data,
-        nome:       client.nome,
-        wpp:        client.wpp,
-        pedidos:    (data.pedidos    || 0) + 1,
-        totalGasto: (data.totalGasto || 0) + order.total,
-        ...(client.email ? { email: client.email } : {}),
-        ...(client.bday  ? { bday:  client.bday  } : {}),
-        ...(client.obs   ? { obs:   client.obs   } : {})
-      });
-    }
+      // Cliente existente — atualiza contadores e favorito
+      const cDoc = existingDocs.docs[0];
+      const data = cDoc.data();
+      const novosPedidos   = (data.pedidos    || 0) + 1;
+      const novoTotalGasto = (data.totalGasto || 0) + (Number(order.total) || 0);
 
-    // Atualiza a lista no admin em tempo real se a aba estiver visível
-    const secClientes = document.getElementById("sec-clientes");
-    if (secClientes && !secClientes.classList.contains("hidden")) {
-      renderClients();
+      // Recalcula favorito: conta qual produto aparece mais no histórico
+      // Para simplificar, usa o produto atual como favorito se for o primeiro pedido
+      const favoritoAtual = data.favorito || "";
+      const favoritoFinal = favoritoAtual || novoFavorito;
+
+      await FB.updateDoc(cDoc.ref, {
+        pedidos:    novosPedidos,
+        totalGasto: novoTotalGasto,
+        favorito:   favoritoFinal,
+        // Atualiza dados pessoais se vieram preenchidos no pedido atual
+        ...(client.nome  ? { nome: client.nome }   : {}),
+        ...(client.bday  ? { bday: client.bday }   : {}),
+        ...(client.email ? { email: client.email } : {}),
+        // Garante que o wpp normalizado está salvo
+        wpp: wppNorm || client.wpp
+      });
+      console.log("Cliente atualizado:", client.nome);
     }
   } catch(e) {
-    console.warn("saveClientToFirebase erro:", e);
+    console.error("Erro ao salvar cliente no Firebase:", e);
+    // Última tentativa: salva sem verificar duplicata
+    try {
+      if (db && FB) {
+        await FB.addDoc(FB.collection(db,"clients"), {
+          nome:       client.nome,
+          wpp:        wppNorm || client.wpp,
+          email:      client.email || "",
+          bday:       client.bday  || "",
+          pedidos:    1,
+          totalGasto: Number(order.total) || 0,
+          favorito:   order.itens?.[0]?.nome || "",
+          createdAt:  FB.serverTimestamp(),
+          _fallback:  true
+        });
+        console.log("Cliente salvo via fallback:", client.nome);
+      }
+    } catch(e2) { console.error("Fallback também falhou:", e2); }
   }
 }
 
@@ -3256,11 +3246,41 @@ function renderOrders() {
 function payLabel(p) { return { pix:"Pix", credito:"Crédito", debito:"Débito", fiado:"Fiado" }[p] || p || "—"; }
 function statusClass(s) { return { pendente:"s-pending", confirmado:"s-confirmed", pronto:"s-ready", entregue:"s-done" }[s] || "s-pending"; }
 
-async function updateOrderStatus(id, status) {
-  try { await fbUpdate("orders", id, { status }); } catch {}
-  allOrders = allOrders.map(o => o.id === id ? {...o, status} : o);
+async function updateOrderStatus(id, newStatus) {
+  const order = allOrders.find(o => o.id === id);
+  const prevStatus = order ? order.status : null;
+
+  try { await fbUpdate("orders", id, { status: newStatus }); } catch(e) { console.warn("updateOrderStatus:", e); }
+  allOrders = allOrders.map(o => o.id === id ? {...o, status: newStatus} : o);
   const badge = allOrders.filter(o => o.status === "pendente").length;
   document.getElementById("badge-pedidos").textContent = badge;
+
+  // ── Baixa o estoque de Pronta Entrega ao marcar como Entregue ──────────────
+  if (newStatus === "entregue" && prevStatus !== "entregue" &&
+      order && order.tipo === "pronta-entrega") {
+    let stockChanged = false;
+    for (const item of (order.itens || [])) {
+      if (!item.prodId) continue;
+      const s = allStock[item.prodId] || {};
+      const newQty = Math.max(0, (s.qty || 0) - (item.qty || 0));
+      allStock[item.prodId] = { ...s, qty: newQty };
+      try {
+        const stockDocs = await FB.getDocs(
+          FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prodId))
+        );
+        if (!stockDocs.empty) {
+          await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
+          stockChanged = true;
+          console.log("Estoque baixado: " + item.nome + " -> " + newQty + " unid.");
+        }
+      } catch(e) { console.warn("Erro ao baixar estoque:", e); }
+    }
+    if (stockChanged) {
+      renderStockAdmin();
+      renderPEProducts();
+    }
+  }
+
   showToast("Status atualizado!");
 }
 
