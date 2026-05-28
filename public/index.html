@@ -1505,6 +1505,13 @@ img { max-width: 100%; display: block; }
     display: flex;
   }
 }
+/* Garante que bottom nav NUNCA aparece no desktop */
+@media (min-width: 901px) {
+  .mob-bottom-nav,
+  #mob-bottom-nav {
+    display: none !important;
+  }
+}
 
 /* Sidebar colapsável no desktop */
 .admin-sidebar.collapsed {
@@ -6511,7 +6518,13 @@ function syncBottomNav(sec) {
 
 function showMobBottomNav(show) {
   const nav = document.getElementById('mob-bottom-nav');
-  if (nav) nav.style.display = show ? 'flex' : 'none';
+  if (!nav) return;
+  // Só exibe em mobile (≤900px)
+  if (show && window.innerWidth <= 900) {
+    nav.style.display = 'flex';
+  } else {
+    nav.style.display = 'none';
+  }
 }
 
 function updateMbnBadge(count) {
