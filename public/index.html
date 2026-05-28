@@ -2315,7 +2315,10 @@ img { max-width: 100%; display: block; }
       <div class="admin-content">
         <div class="orders-toolbar">
           <input class="orders-search" id="orders-search" type="text" placeholder="🔍 Buscar por cliente, produto, número..." oninput="renderOrders()">
-          <button class="btn-sm-outline" onclick="exportOrdersCSV()"><i class="ti ti-download" style="font-size:13px;"></i> Exportar CSV</button>
+          <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button class="btn-sm-primary" onclick="openVendaPresencial()" style="display:flex;align-items:center;gap:6px;background:var(--teal);"><i class="ti ti-shopping-bag" style="font-size:14px;"></i> Venda Presencial</button>
+            <button class="btn-sm-outline" onclick="exportOrdersCSV()"><i class="ti ti-download" style="font-size:13px;"></i> Exportar CSV</button>
+          </div>
         </div>
         <div class="status-filters">
           <button class="sf-btn active" onclick="filterOrders('todos',this)">Todos</button>
@@ -5904,6 +5907,172 @@ document.addEventListener("DOMContentLoaded", () => {
     showPage("page-login");
   }
 });
+
+// ─── VENDA PRESENCIAL ──────────────────────────────────
+let vpQtys = {}; // { prodId: qty }
+
+function openVendaPresencial() {
+  vpQtys = {};
+  // Popula data com hoje
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("vp-data").value = today;
+  document.getElementById("vp-nome").value = "";
+  document.getElementById("vp-wpp").value = "";
+  document.getElementById("vp-pagamento").value = "pix";
+
+  // Lista produtos com estoque PE ativo
+  const prods = allProducts.filter(p => {
+    if (p.ativo === false || p.categoria === "combo") return false;
+    const s = allStock[p.id];
+    return s && s.ativo && (s.qty || 0) > 0;
+  });
+
+  const list = document.getElementById("vp-products-list");
+  const noStock = document.getElementById("vp-no-stock");
+
+  if (prods.length === 0) {
+    list.innerHTML = "";
+    noStock.classList.remove("hidden");
+  } else {
+    noStock.classList.add("hidden");
+    prods.forEach(p => { vpQtys[p.id] = 0; });
+    list.innerHTML = prods.map(p => {
+      const s = allStock[p.id];
+      const maxQty = s ? (s.qty || 0) : 0;
+      const preco = Number(p.preco).toFixed(2).replace(".", ",");
+      return `<div class="vp-prod-row" id="vp-row-${p.id}">
+        <div class="vp-prod-emoji">${p.emoji || "🍪"}</div>
+        <div class="vp-prod-info">
+          <div class="vp-prod-name">${p.nome}</div>
+          <div class="vp-prod-stock">Disponível: ${maxQty} unid. · R$ ${preco}/un</div>
+        </div>
+        <div class="vp-qty-ctrl">
+          <button class="vp-qty-btn" onclick="vpChangeQty('${p.id}',-1)">−</button>
+          <span class="vp-qty-num" id="vp-qty-${p.id}">0</span>
+          <button class="vp-qty-btn" onclick="vpChangeQty('${p.id}',1)">+</button>
+        </div>
+        <div class="vp-prod-price" id="vp-price-${p.id}">R$ 0,00</div>
+      </div>`;
+    }).join("");
+  }
+  vpUpdateTotal();
+  document.getElementById("vp-modal").classList.add("open");
+}
+
+function closeVendaPresencial() {
+  document.getElementById("vp-modal").classList.remove("open");
+}
+
+function vpChangeQty(prodId, delta) {
+  const s = allStock[prodId];
+  const maxQty = s ? (s.qty || 0) : 0;
+  const current = vpQtys[prodId] || 0;
+  const newQty = Math.min(Math.max(0, current + delta), maxQty);
+  vpQtys[prodId] = newQty;
+  const qtyEl = document.getElementById("vp-qty-" + prodId);
+  if (qtyEl) qtyEl.textContent = newQty;
+  // Atualiza preço da linha
+  const prod = allProducts.find(p => p.id === prodId);
+  const lineTotal = prod ? newQty * Number(prod.preco) : 0;
+  const priceEl = document.getElementById("vp-price-" + prodId);
+  if (priceEl) priceEl.textContent = "R$ " + lineTotal.toFixed(2).replace(".", ",");
+  vpUpdateTotal();
+}
+
+function vpUpdateTotal() {
+  let total = 0;
+  for (const [prodId, qty] of Object.entries(vpQtys)) {
+    const prod = allProducts.find(p => p.id === prodId);
+    if (prod && qty > 0) total += qty * Number(prod.preco);
+  }
+  const el = document.getElementById("vp-total-display");
+  if (el) el.textContent = "R$ " + total.toFixed(2).replace(".", ",");
+}
+
+async function confirmarVendaPresencial() {
+  // Valida que pelo menos 1 produto foi selecionado
+  const itens = [];
+  let total = 0;
+  for (const [prodId, qty] of Object.entries(vpQtys)) {
+    if (qty <= 0) continue;
+    const prod = allProducts.find(p => p.id === prodId);
+    if (!prod) continue;
+    const s = allStock[prodId];
+    if (!s || qty > (s.qty || 0)) {
+      showToast(`Estoque insuficiente para ${prod.nome}`);
+      return;
+    }
+    itens.push({ prodId, nome: prod.nome, qty, preco: Number(prod.preco), emoji: prod.emoji || "🍪" });
+    total += qty * Number(prod.preco);
+  }
+  if (itens.length === 0) {
+    showToast("Selecione pelo menos 1 produto!");
+    return;
+  }
+
+  const nomeCliente = document.getElementById("vp-nome").value.trim() || "Venda Presencial";
+  const wppCliente  = document.getElementById("vp-wpp").value.trim();
+  const pagamento   = document.getElementById("vp-pagamento").value;
+  const dataVenda   = document.getElementById("vp-data").value;
+
+  const btn = document.getElementById("vp-confirm-btn");
+  btn.disabled = true;
+  btn.innerHTML = `<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Registrando...`;
+
+  try {
+    // 1. Cria pedido com tipo "venda-presencial" + já entregue
+    const orderNum = Date.now();
+    const orderData = {
+      orderNum,
+      tipo: "venda-presencial",
+      status: "entregue",
+      pagamento,
+      pagamentoConfirmado: pagamento !== "fiado",
+      total,
+      itens,
+      cliente: { nome: nomeCliente, wpp: wppCliente },
+      dataRetirada: dataVenda,
+      periodo: "Presencial",
+      _stockDecremented: true,
+      createdAt: FB.serverTimestamp(),
+      obs: "Venda registrada manualmente pelo admin"
+    };
+    const ref = await fbAdd("orders", orderData);
+    allOrders.unshift({ ...orderData, id: ref.id, createdAt: { seconds: Date.now()/1000 } });
+
+    // 2. Baixa estoque de cada produto
+    for (const item of itens) {
+      const s = allStock[item.prodId] || {};
+      const newQty = Math.max(0, (s.qty || 0) - item.qty);
+      allStock[item.prodId] = { ...s, qty: newQty };
+      try {
+        const stockDocs = await FB.getDocs(
+          FB.query(FB.collection(db, "stock"), FB.where("prodId", "==", item.prodId))
+        );
+        if (!stockDocs.empty) {
+          await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
+        }
+      } catch(e) { console.warn("Erro ao baixar estoque:", e); }
+    }
+
+    renderStockAdmin();
+    renderPEProducts();
+    renderOrders();
+
+    const badge = allOrders.filter(o => o.status === "pendente").length;
+    document.getElementById("badge-pedidos").textContent = badge;
+    updateMbnBadge(badge);
+
+    closeVendaPresencial();
+    showToast(`✅ Venda registrada! ${itens.length} produto(s) · R$ ${total.toFixed(2).replace(".",",")}`);
+  } catch(e) {
+    console.error("Erro ao registrar venda:", e);
+    showToast("Erro ao registrar venda. Tente novamente.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i class="ti ti-check"></i> Registrar venda`;
+  }
+}
 </script>
 
 <style>
@@ -6160,6 +6329,63 @@ document.addEventListener("DOMContentLoaded", () => {
   #sec-depoimentos > div:first-child div:first-child { font-size: 24px; }
   #depoimentos-grid { grid-template-columns: 1fr; }
 }
+
+/* ═══════════════════════════════════════════════════════
+   MODAL: VENDA PRESENCIAL
+═══════════════════════════════════════════════════════ */
+.vp-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  z-index: 320; display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.vp-overlay.open { display: flex; }
+.vp-box {
+  background: var(--white); border-radius: 20px;
+  width: 100%; max-width: 520px; max-height: 90vh;
+  display: flex; flex-direction: column;
+  animation: fadeIn .25s ease; box-shadow: 0 24px 64px rgba(0,0,0,0.22);
+  overflow: hidden;
+}
+.vp-header {
+  background: var(--teal-dark); padding: 20px 24px;
+  display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0;
+}
+.vp-title { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: #fff; }
+.vp-sub { color: rgba(255,255,255,0.55); font-size: 12px; margin-top: 3px; }
+.vp-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.vp-footer {
+  padding: 14px 24px; border-top: 0.5px solid var(--border);
+  display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0;
+  background: var(--cream);
+}
+.vp-section-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--teal-dark);
+  margin-bottom: 10px;
+}
+.vp-label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+
+/* Linha de produto no modal */
+.vp-prod-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--cream); border-radius: 10px;
+  padding: 10px 12px; border: 0.5px solid var(--border);
+}
+.vp-prod-emoji { font-size: 22px; flex-shrink: 0; }
+.vp-prod-info { flex: 1; min-width: 0; }
+.vp-prod-name { font-size: 13px; font-weight: 500; color: var(--teal-dark); }
+.vp-prod-stock { font-size: 11px; color: var(--muted); }
+.vp-qty-ctrl { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.vp-qty-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--border-mid); background: var(--white);
+  font-size: 16px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.vp-qty-btn:hover { background: var(--cream-dark); }
+.vp-qty-num { font-size: 14px; font-weight: 500; min-width: 20px; text-align: center; }
+.vp-prod-price { font-size: 12px; font-weight: 600; color: var(--teal-dark); flex-shrink: 0; min-width: 64px; text-align: right; }
+
 </style>
 
 <!-- ═══════════════════════════════════════════════════
@@ -6254,6 +6480,78 @@ document.addEventListener("DOMContentLoaded", () => {
     </div>
     <div class="client-hist-body" id="client-hist-body">
       <div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center;">Carregando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     MODAL: VENDA PRESENCIAL (admin)
+══════════════════════════════════════════════════════ -->
+<div class="vp-overlay" id="vp-modal">
+  <div class="vp-box">
+    <div class="vp-header">
+      <div>
+        <div class="vp-title">🛍️ Venda Presencial</div>
+        <div class="vp-sub">Registre vendas feitas no balcão e dê baixa no estoque</div>
+      </div>
+      <button class="gw-close" onclick="closeVendaPresencial()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="vp-body">
+
+      <!-- Cliente (opcional) -->
+      <div class="vp-section-title">Cliente <span style="font-weight:400;color:var(--muted);font-size:11px;">(opcional)</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div>
+          <label class="vp-label">Nome</label>
+          <input class="fi" id="vp-nome" type="text" placeholder="Nome do cliente">
+        </div>
+        <div>
+          <label class="vp-label">WhatsApp</label>
+          <input class="fi" id="vp-wpp" type="tel" placeholder="85 9 9999-9999">
+        </div>
+      </div>
+
+      <!-- Produtos -->
+      <div class="vp-section-title">Produtos vendidos</div>
+      <div id="vp-products-list" style="margin-bottom:12px;display:flex;flex-direction:column;gap:8px;">
+        <!-- populado por JS -->
+      </div>
+      <div id="vp-no-stock" class="hidden" style="color:var(--muted);font-size:13px;padding:12px;background:var(--cream);border-radius:8px;text-align:center;">
+        Nenhum produto com estoque ativo disponível.<br>Ative produtos na seção <strong>Estoque PE</strong> primeiro.
+      </div>
+
+      <!-- Pagamento -->
+      <div class="vp-section-title" style="margin-top:16px;">Pagamento</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div>
+          <label class="vp-label">Forma</label>
+          <select class="fi" id="vp-pagamento">
+            <option value="pix">Pix</option>
+            <option value="credito">Crédito</option>
+            <option value="debito">Débito</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="fiado">Fiado</option>
+          </select>
+        </div>
+        <div>
+          <label class="vp-label">Data da venda</label>
+          <input class="fi" id="vp-data" type="date">
+        </div>
+      </div>
+
+      <!-- Total -->
+      <div style="background:var(--teal-dark);border-radius:10px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <span style="color:rgba(255,255,255,0.7);font-size:13px;">Total da venda</span>
+        <span id="vp-total-display" style="font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--gold-light);">R$ 0,00</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:18px;">O estoque dos produtos selecionados será baixado automaticamente.</div>
+
+    </div>
+    <div class="vp-footer">
+      <button class="btn-sm-outline" onclick="closeVendaPresencial()">Cancelar</button>
+      <button class="btn-sm-primary" onclick="confirmarVendaPresencial()" id="vp-confirm-btn" style="background:var(--teal-dark);display:flex;align-items:center;gap:6px;">
+        <i class="ti ti-check"></i> Registrar venda
+      </button>
     </div>
   </div>
 </div>
