@@ -3994,7 +3994,7 @@ async function updateOrderStatus(id, newStatus) {
 
   // ── Baixa estoque PE ao entregar ──────────────────────────────
   if (newStatus === "entregue" && prevStatus !== "entregue" &&
-      order && order.tipo === "pronta-entrega") {
+      order && order.tipo === "pronta-entrega" && !order._stockDecremented) {
     let stockChanged = false;
     for (const item of (order.itens || [])) {
       if (!item.prodId) continue;
@@ -4016,23 +4016,32 @@ async function updateOrderStatus(id, newStatus) {
     if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
   }
 
-  // ── Devolve estoque PE se cancelado (e já tinha decrementado) ──
-  if (newStatus === "cancelado" && order?.tipo === "pronta-entrega" && order?._stockDecremented) {
-    for (const item of (order.itens || [])) {
-      if (!item.prodId) continue;
-      const s = allStock[item.prodId] || {};
-      const restored = (s.qty || 0) + (item.qty || 0);
-      allStock[item.prodId] = { ...s, qty: restored };
-      try {
-        const stockDocs = await FB.getDocs(
-          FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prodId))
-        );
-        if (!stockDocs.empty) await FB.updateDoc(stockDocs.docs[0].ref, { qty: restored });
-      } catch(e) { console.warn("Erro ao restaurar estoque:", e); }
+  // ── Devolve estoque PE se cancelado ──────────────────────────
+  // Restaura se: (a) flag _stockDecremented está true, OU
+  //              (b) status anterior era "entregue" (estoque já foi baixado)
+  if (newStatus === "cancelado" && order?.tipo === "pronta-entrega") {
+    const shouldRestore = order._stockDecremented === true || prevStatus === "entregue";
+    if (shouldRestore) {
+      let stockChanged = false;
+      for (const item of (order.itens || [])) {
+        if (!item.prodId) continue;
+        const s = allStock[item.prodId] || {};
+        const restored = (s.qty || 0) + (item.qty || 0);
+        allStock[item.prodId] = { ...s, qty: restored };
+        try {
+          const stockDocs = await FB.getDocs(
+            FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prodId))
+          );
+          if (!stockDocs.empty) {
+            await FB.updateDoc(stockDocs.docs[0].ref, { qty: restored });
+            stockChanged = true;
+          }
+        } catch(e) { console.warn("Erro ao restaurar estoque:", e); }
+      }
+      try { await fbUpdate("orders", id, { _stockDecremented: false }); } catch(e) {}
+      allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: false } : o);
+      if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
     }
-    try { await fbUpdate("orders", id, { _stockDecremented: false }); } catch(e) {}
-    allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: false } : o);
-    renderStockAdmin(); renderPEProducts();
   }
 
   renderOrders();
