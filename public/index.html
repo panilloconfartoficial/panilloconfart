@@ -48,6 +48,7 @@
   // ────────────────────────────────────────────────────────────────────────────
 
   if (cfg) { // só inicializa se a config foi carregada com sucesso
+  const app  = initializeApp(cfg.firebase);
   // Força HTTP long-polling para evitar erros QUIC em redes que bloqueiam o protocolo
   // (resolve ERR_QUIC_PROTOCOL_ERROR e ERR_NAME_NOT_RESOLVED no Firestore)
   const db = initializeFirestore(app, { experimentalForceLongPolling: true });
