@@ -640,7 +640,19 @@ img { max-width: 100%; display: block; }
 .admin-sidebar {
   width: 220px; background: #0D3D3D; flex-shrink: 0;
   display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  transition: width .25s cubic-bezier(.4,0,.2,1);
 }
+/* Collapsed sidebar on desktop */
+.admin-sidebar.collapsed { width: 60px; overflow: hidden; }
+.admin-sidebar.collapsed .sb-brand,
+.admin-sidebar.collapsed .sb-label,
+.admin-sidebar.collapsed .sb-section,
+.admin-sidebar.collapsed .sb-badge,
+.admin-sidebar.collapsed .sb-exit span { display: none; }
+.admin-sidebar.collapsed .sb-item { padding: 10px; justify-content: center; }
+.admin-sidebar.collapsed .sb-icon { margin: 0; }
+.admin-sidebar.collapsed .sidebar-logo-wrap { justify-content: center; padding: 14px 0; }
+.admin-sidebar.collapsed .sb-exit { justify-content: center; padding: 16px 0; }
 .sidebar-logo-wrap {
   padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 8px;
   display: flex; align-items: center; gap: 10px;
@@ -649,8 +661,11 @@ img { max-width: 100%; display: block; }
   width: 34px; height: 34px; border-radius: 50%; background: var(--gold);
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-display); font-size: 16px; font-weight: 600; color: #fff;
+  cursor: pointer; flex-shrink: 0;
+  transition: transform .2s, box-shadow .2s;
 }
-.sb-brand { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: #E8B84B; }
+.sb-logo-c:hover { transform: scale(1.08); box-shadow: 0 0 0 3px rgba(200,144,42,0.35); }
+.sb-brand { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: #E8B84B; transition: opacity .2s; white-space: nowrap; }
 .sb-section {
   padding: 10px 14px 3px 20px; font-size: 9px;
   letter-spacing: 1.8px; text-transform: uppercase; color: rgba(255,255,255,0.28); margin-top: 8px;
@@ -1439,7 +1454,7 @@ img { max-width: 100%; display: block; }
 
 /* ── BOTTOM NAV (admin, mobile) ───────────────────────── */
 .mob-bottom-nav {
-  display: none;
+  display: none; /* mobile-only — shown inside @media (max-width:900px) below */
   position: fixed; bottom: 0; left: 0; right: 0;
   z-index: 150;
   background: #0D3D3D;
@@ -1449,6 +1464,10 @@ img { max-width: 100%; display: block; }
   justify-content: space-around;
   align-items: stretch;
   box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
+}
+/* Garantia extra: nunca exibir o bottom nav em desktop */
+@media (min-width: 901px) {
+  .mob-bottom-nav, .mob-bottom-nav.admin-visible { display: none !important; }
 }
 .mbn-item {
   flex: 1; display: flex; flex-direction: column;
@@ -2145,7 +2164,7 @@ img { max-width: 100%; display: block; }
   <!-- SIDEBAR -->
   <aside class="admin-sidebar">
     <div class="sidebar-logo-wrap">
-      <div class="sb-logo-c">P</div>
+      <div class="sb-logo-c" onclick="toggleSidebarCollapse()" title="Retrair menu">P</div>
       <span class="sb-brand">Panillo</span>
     </div>
     <div class="sb-section">Geral</div>
@@ -3021,9 +3040,13 @@ function renderPEProducts() {
         ? "background:linear-gradient(135deg,#FDF6E8,#F5E0B0);"
         : "background:linear-gradient(135deg,#FDF0DC,#F5E0B0);";
     const cardOp = qty === 0 ? "opacity:0.55;" : "";
+    const imgContent = p.fotoUrl
+      ? `<img src="${p.fotoUrl}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;object-position:${p.fotoPos?p.fotoPos.x+'% '+p.fotoPos.y+'%':'50% 50%'};transform:scale(${p.fotoPos?p.fotoPos.zoom/100:1});transform-origin:${p.fotoPos?p.fotoPos.x+'% '+p.fotoPos.y+'%':'50% 50%'};" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+        + `<span style="display:none;font-size:72px;align-items:center;justify-content:center;width:100%;height:100%;">${p.emoji||"🍪"}</span>`
+      : `<span style="font-size:72px;">${p.emoji || "🍪"}</span>`;
     return `<div class="product-card" style="${cardOp}" id="pe-card-${p.id}">
-      <div class="prod-img ${p.categoria}" style="${imgBg}">
-        <span style="font-size:72px;">${p.emoji || "🍪"}</span>
+      <div class="prod-img ${p.categoria}" style="${imgBg}position:relative;overflow:hidden;">
+        ${imgContent}
       </div>
       <div class="prod-body">
         <div class="prod-name">${p.nome}</div>
@@ -5841,6 +5864,19 @@ function toggleAdminSidebar() {
   overlay.classList.toggle("open", !isOpen);
 }
 
+// Colapsa/expande sidebar no desktop (clique no "P")
+function toggleSidebarCollapse() {
+  if (window.innerWidth <= 900) {
+    // No mobile funciona como drawer normal
+    toggleAdminSidebar();
+    return;
+  }
+  const sidebar = document.querySelector(".admin-sidebar");
+  sidebar.classList.toggle("collapsed");
+  // Persiste preferência
+  localStorage.setItem("panillo-sidebar-collapsed", sidebar.classList.contains("collapsed") ? "1" : "0");
+}
+
 // Fecha sidebar ao clicar em um item (mobile)
 // ─── INIT ──────────────────────────────────────────────
 updateCartUI();
@@ -5856,6 +5892,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // Config e logo
   loadConfig();
   applyLogo(LOGO_BASE64);
+
+  // Restaura estado colapsado do sidebar (desktop)
+  if (window.innerWidth > 900 && localStorage.getItem("panillo-sidebar-collapsed") === "1") {
+    document.querySelector(".admin-sidebar")?.classList.add("collapsed");
+  }
 
   // Rota /admin → abre tela de login
   const path = window.location.pathname;
