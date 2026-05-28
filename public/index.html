@@ -6840,23 +6840,30 @@ function closeVendaPresencial() {
   document.getElementById("modal-venda-presencial").style.display = "none";
 }
 
+let _vpSearchResults = []; // cache dos resultados para seleção por índice
+
 function vpSearchClient(q) {
   const list = document.getElementById("vp-client-list");
-  if (!q.trim()) { list.style.display = "none"; return; }
-  const results = allClients.filter(c =>
+  if (!q.trim()) { list.style.display = "none"; _vpSearchResults = []; return; }
+  _vpSearchResults = allClients.filter(c =>
     (c.nome||"").toLowerCase().includes(q.toLowerCase()) ||
     (c.wpp||"").includes(q)
   ).slice(0, 6);
-  if (!results.length) { list.innerHTML = '<div style="padding:12px;color:var(--muted);font-size:12px;">Nenhum cliente encontrado</div>'; list.style.display = "block"; return; }
-  list.innerHTML = results.map(c => `
-    <div onclick="vpSelectClient(${JSON.stringify(JSON.stringify(c))})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background=''">
+  if (!_vpSearchResults.length) {
+    list.innerHTML = '<div style="padding:12px;color:var(--muted);font-size:12px;">Nenhum cliente encontrado</div>';
+    list.style.display = "block";
+    return;
+  }
+  list.innerHTML = _vpSearchResults.map((c, i) => `
+    <div onclick="vpSelectClient(${i})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;" onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background=''">
       <strong>${c.nome||"?"}</strong> <span style="color:var(--muted);font-size:11px;">${c.wpp||""}</span>
     </div>`).join("");
   list.style.display = "block";
 }
 
-function vpSelectClient(jsonStr) {
-  const c = JSON.parse(jsonStr);
+function vpSelectClient(idx) {
+  const c = _vpSearchResults[idx];
+  if (!c) return;
   _vpClient = c;
   document.getElementById("vp-client-search").value = c.nome || "";
   document.getElementById("vp-client-list").style.display = "none";
