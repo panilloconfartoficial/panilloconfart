@@ -1029,6 +1029,7 @@ img { max-width: 100%; display: block; }
   text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted);
   padding: 10px 14px; text-align: left; border-bottom: 0.5px solid var(--border);
 }
+.clients-table th[onclick]:hover { background: var(--cream); color: var(--teal-dark); }
 .clients-table td { padding: 11px 14px; font-size: 13px; border-bottom: 0.5px solid var(--border); vertical-align: middle; }
 .clients-table tr:hover td { background: var(--cream); }
 .client-av { width: 32px; height: 32px; border-radius: 50%; background: var(--teal-dark); color: #fff; font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; }
@@ -2556,13 +2557,26 @@ img { max-width: 100%; display: block; }
           <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
           <div class="admin-page-title">Clientes</div>
         </div>
+        <div id="clients-total-badge" style="font-size:12px;font-weight:600;background:var(--teal);color:#fff;padding:4px 12px;border-radius:20px;"></div>
       </div>
       <div class="admin-content">
         <!-- Birthday alerts -->
         <div id="bday-alerts-wrap" class="bday-alerts-wrap"></div>
-        <!-- Search + stats bar -->
+        <!-- Search + filters bar -->
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
           <input class="clients-search" id="clients-search" type="text" placeholder="🔍 Buscar por nome, WhatsApp..." oninput="renderClients()">
+          <!-- Sort select -->
+          <select id="clients-sort" onchange="renderClients()"
+            style="padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:12px;color:var(--text);background:#fff;cursor:pointer;outline:none;">
+            <option value="nome-az">A→Z Nome</option>
+            <option value="nome-za">Z→A Nome</option>
+            <option value="gasto-maior">Maior gasto</option>
+            <option value="gasto-menor">Menor gasto</option>
+            <option value="pedidos-maior">Mais pedidos</option>
+            <option value="pedidos-menor">Menos pedidos</option>
+            <option value="aniversario">Aniversário próximo</option>
+          </select>
+          <!-- Inactive filter -->
           <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:4px 10px;">
             <span style="font-size:12px;color:var(--muted);">Inativos há mais de</span>
             <input id="inactive-days" type="number" min="1" max="365" value="60" style="width:50px;border:none;outline:none;font-size:13px;font-weight:600;color:var(--teal-dark);text-align:center;">
@@ -2576,15 +2590,16 @@ img { max-width: 100%; display: block; }
           <table class="clients-table">
             <thead>
               <tr>
-                <th></th>
-                <th>Nome</th>
+                <th style="width:40px;">#</th>
+                <th style="cursor:pointer;" onclick="setClientsSort('nome-az','nome-za')" id="th-nome">Nome ↕</th>
                 <th>WhatsApp</th>
-                <th>Aniversário</th>
-                <th>Pedidos</th>
-                <th>Total gasto</th>
+                <th style="cursor:pointer;" onclick="setClientsSort('aniversario','')" id="th-aniv">Aniversário ↕</th>
+                <th style="cursor:pointer;" onclick="setClientsSort('pedidos-maior','pedidos-menor')" id="th-pedidos">Pedidos ↕</th>
+                <th style="cursor:pointer;" onclick="setClientsSort('gasto-maior','gasto-menor')" id="th-gasto">Total gasto ↕</th>
                 <th>Favorito</th>
                 <th>Fiado</th>
                 <th>Ações</th>
+              </tr>
             </thead>
             <tbody id="clients-tbody"></tbody>
           </table>
@@ -2789,7 +2804,8 @@ img { max-width: 100%; display: block; }
           <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
           <div class="admin-page-title">Contas Fiado</div>
         </div>
-        <div class="topbar-right">
+        <div class="topbar-right" style="display:flex;align-items:center;gap:8px;">
+          <div id="fiado-total-badge" style="font-size:12px;font-weight:600;background:#993C1D;color:#fff;padding:4px 12px;border-radius:20px;"></div>
           <button class="btn-sm-primary" onclick="openFiadoAuthModal()"><i class="ti ti-user-plus" style="font-size:13px;"></i> Autorizar cliente</button>
         </div>
       </div>
@@ -2807,6 +2823,28 @@ img { max-width: 100%; display: block; }
             <div class="fm-label">Recebido este mês</div>
             <div class="fm-val ok" id="fm-recebido">R$ 0,00</div>
           </div>
+        </div>
+        <!-- Search + sort bar -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <input id="fiado-search" type="text" placeholder="🔍 Buscar por nome ou WhatsApp..."
+            oninput="renderFiadoAdmin()"
+            style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;color:var(--text);background:#fff;outline:none;">
+          <select id="fiado-sort" onchange="renderFiadoAdmin()"
+            style="padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:12px;color:var(--text);background:#fff;cursor:pointer;outline:none;">
+            <option value="nome-az">A→Z Nome</option>
+            <option value="nome-za">Z→A Nome</option>
+            <option value="saldo-maior">Maior saldo devedor</option>
+            <option value="saldo-menor">Menor saldo devedor</option>
+            <option value="saldo-zero">Quitados primeiro</option>
+            <option value="saldo-aberto">Em aberto primeiro</option>
+          </select>
+          <select id="fiado-filter" onchange="renderFiadoAdmin()"
+            style="padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:12px;color:var(--text);background:#fff;cursor:pointer;outline:none;">
+            <option value="todos">Todos</option>
+            <option value="aberto">Com saldo em aberto</option>
+            <option value="quitado">Quitados</option>
+          </select>
+          <span id="fiado-count" style="font-size:12px;color:var(--muted);white-space:nowrap;"></span>
         </div>
         <div class="fiado-client-list" id="fiado-client-list">
           <div style="color:var(--muted);font-size:13px;padding:20px;">Nenhum cliente com fiado ativo.</div>
@@ -4312,42 +4350,68 @@ function filterOrders(status, btn) {
 async function renderClients() {
   let clients = [];
   try { clients = await fbGet("clients"); allClients = clients; } catch {}
-  // Garante que allFiadoAccounts está carregado
   if (!allFiadoAccounts || allFiadoAccounts.length === 0) {
     try { allFiadoAccounts = await fbGet("fiadoAccounts"); } catch { allFiadoAccounts = []; }
   }
+
+  // Total badge (always total, regardless of filters)
+  const totalBadge = document.getElementById("clients-total-badge");
+  if (totalBadge) totalBadge.textContent = `${clients.length} cliente${clients.length !== 1 ? "s" : ""}`;
 
   // Birthday alerts
   renderBdayAlerts(clients);
 
   // Search filter
   const q = (document.getElementById("clients-search")?.value || "").toLowerCase();
-  const filtered = q
+  let filtered = q
     ? clients.filter(c => (c.nome||"").toLowerCase().includes(q) || (c.wpp||"").includes(q))
-    : clients;
+    : [...clients];
+
+  // Sort
+  const sort = document.getElementById("clients-sort")?.value || "nome-az";
+  const today = new Date();
+  filtered.sort((a, b) => {
+    switch (sort) {
+      case "nome-az":       return (a.nome||"").localeCompare(b.nome||"", "pt-BR");
+      case "nome-za":       return (b.nome||"").localeCompare(a.nome||"", "pt-BR");
+      case "gasto-maior":   return Number(b.totalGasto||0) - Number(a.totalGasto||0);
+      case "gasto-menor":   return Number(a.totalGasto||0) - Number(b.totalGasto||0);
+      case "pedidos-maior": return Number(b.pedidos||0) - Number(a.pedidos||0);
+      case "pedidos-menor": return Number(a.pedidos||0) - Number(b.pedidos||0);
+      case "aniversario": {
+        const diff = (c) => {
+          if (!c.bday) return 999;
+          const bd = new Date(c.bday+"T12:00");
+          const bdThis = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
+          const d = Math.ceil((bdThis - today)/(1000*60*60*24));
+          return d < 0 ? d + 365 : d;
+        };
+        return diff(a) - diff(b);
+      }
+      default: return 0;
+    }
+  });
 
   const countEl = document.getElementById("clients-count");
-  if (countEl) countEl.textContent = `${filtered.length} cliente(s)`;
+  if (countEl) countEl.textContent = q ? `${filtered.length} de ${clients.length} cliente(s)` : `${filtered.length} cliente(s)`;
 
-  const today = new Date();
   const tbody = document.getElementById("clients-tbody");
   tbody.innerHTML = filtered.length === 0
     ? `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted);">Nenhum cliente encontrado</td></tr>`
-    : filtered.map(c => {
+    : filtered.map((c, index) => {
         // Birthday badge
         let bdayHtml = "—";
-        let bdayUrgency = "";
         if (c.bday) {
           const bd = new Date(c.bday + "T12:00");
           const bdThis = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
           const diff = Math.ceil((bdThis - today)/(1000*60*60*24));
           const diffAdj = diff < 0 ? diff + 365 : diff;
           const label = diffAdj === 0 ? "🎉 Hoje!" : diffAdj === 1 ? "Amanhã" : diffAdj <= 5 ? `em ${diffAdj} dias` : "";
-          bdayUrgency = diffAdj <= 5 ? "bday-soon" : diffAdj <= 14 ? "bday-ok" : "";
-          bdayHtml = `<span class="bday-badge ${bdayUrgency}" style="font-size:12px;">${bd.toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}${label ? ` · <b>${label}</b>` : ""}</span>`;
+          const cls = diffAdj <= 5 ? "bday-soon" : diffAdj <= 14 ? "bday-ok" : "";
+          bdayHtml = `<span class="bday-badge ${cls}" style="font-size:12px;">${bd.toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}${label ? ` · <b>${label}</b>` : ""}</span>`;
         }
         // Fiado badge
-        const fiadoAcc = allFiadoAccounts.find(a => a.clientWpp?.replace(/\D/g,"") === (c.wpp||"").replace(/\D/g,""));
+        const fiadoAcc = allFiadoAccounts.find(a => (a.clientWpp||"").replace(/\D/g,"") === (c.wpp||"").replace(/\D/g,""));
         let fiadoHtml;
         if (fiadoAcc && fiadoAcc.autorizado) {
           const saldo = Number(fiadoAcc.saldo||0).toFixed(2).replace(".",",");
@@ -4359,12 +4423,20 @@ async function renderClients() {
         }
         const idSafe = (c.id||"").replace(/'/g,"\\'");
         return `<tr>
-          <td><div class="client-av">${(c.nome||"?").substring(0,2).toUpperCase()}</div></td>
-          <td class="client-name">${c.nome||"—"}${c.obs?`<br><span style="font-size:10px;color:var(--muted);">${c.obs.substring(0,40)}</span>`:""}</td>
+          <td style="text-align:center;font-size:11px;color:var(--muted);font-weight:600;">${index + 1}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="client-av" style="flex-shrink:0;">${(c.nome||"?").substring(0,2).toUpperCase()}</div>
+              <div>
+                <div class="client-name">${c.nome||"—"}</div>
+                ${c.obs ? `<div style="font-size:10px;color:var(--muted);">${c.obs.substring(0,35)}…</div>` : ""}
+              </div>
+            </div>
+          </td>
           <td><a href="https://wa.me/55${(c.wpp||"").replace(/\D/g,"")}" target="_blank" style="color:var(--teal);text-decoration:none;">${c.wpp||"—"}</a></td>
           <td>${bdayHtml}</td>
-          <td style="text-align:center;">${c.pedidos||0}</td>
-          <td>R$ ${Number(c.totalGasto||0).toFixed(2).replace(".",",")}</td>
+          <td style="text-align:center;font-weight:600;color:var(--teal-dark);">${c.pedidos||0}</td>
+          <td style="font-weight:600;">R$ ${Number(c.totalGasto||0).toFixed(2).replace(".",",")}</td>
           <td style="font-size:12px;">${c.favorito||"—"}</td>
           <td>${fiadoHtml}</td>
           <td>
@@ -4580,6 +4652,7 @@ async function renderFiadoAdmin() {
     });
   });
 
+  // KPI metrics
   const fmCount = document.getElementById("fm-count");
   const fmTotal = document.getElementById("fm-total");
   const fmRecebido = document.getElementById("fm-recebido");
@@ -4587,15 +4660,50 @@ async function renderFiadoAdmin() {
   if (fmTotal) fmTotal.textContent = "R$ " + totalAberto.toFixed(2).replace(".",",");
   if (fmRecebido) fmRecebido.textContent = "R$ " + recebidoMes.toFixed(2).replace(".",",");
 
-  if (active.length === 0) {
+  // Total badge in topbar
+  const totalBadge = document.getElementById("fiado-total-badge");
+  if (totalBadge) totalBadge.textContent = `${active.length} conta${active.length !== 1 ? "s" : ""}`;
+
+  // Search
+  const q = (document.getElementById("fiado-search")?.value || "").toLowerCase();
+  let filtered = q
+    ? active.filter(a => (a.clientNome||"").toLowerCase().includes(q) || (a.clientWpp||"").includes(q))
+    : [...active];
+
+  // Status filter
+  const statusFilter = document.getElementById("fiado-filter")?.value || "todos";
+  if (statusFilter === "aberto")   filtered = filtered.filter(a => (a.saldo||0) > 0);
+  if (statusFilter === "quitado")  filtered = filtered.filter(a => (a.saldo||0) <= 0);
+
+  // Sort
+  const sort = document.getElementById("fiado-sort")?.value || "nome-az";
+  filtered.sort((a, b) => {
+    switch (sort) {
+      case "nome-az":      return (a.clientNome||"").localeCompare(b.clientNome||"", "pt-BR");
+      case "nome-za":      return (b.clientNome||"").localeCompare(a.clientNome||"", "pt-BR");
+      case "saldo-maior":  return Number(b.saldo||0) - Number(a.saldo||0);
+      case "saldo-menor":  return Number(a.saldo||0) - Number(b.saldo||0);
+      case "saldo-zero":   return Number(a.saldo||0) - Number(b.saldo||0); // quitados (0) primeiro
+      case "saldo-aberto": return Number(b.saldo||0) - Number(a.saldo||0); // em aberto primeiro
+      default: return 0;
+    }
+  });
+
+  // Count
+  const countEl = document.getElementById("fiado-count");
+  if (countEl) countEl.textContent = q || statusFilter !== "todos"
+    ? `${filtered.length} de ${active.length} conta(s)`
+    : `${filtered.length} conta(s)`;
+
+  if (filtered.length === 0) {
     list.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;">
-      <div style="font-size:32px;margin-bottom:8px;">🤝</div>
-      Nenhum cliente com conta fiado ativa. Use o botão "Autorizar cliente" para começar.
+      <div style="font-size:32px;margin-bottom:8px;">🔍</div>
+      Nenhuma conta encontrada com os filtros selecionados.
     </div>`;
     return;
   }
 
-  list.innerHTML = active.map(a => {
+  list.innerHTML = filtered.map((a, index) => {
     const saldo = a.saldo || 0;
     const badgeClass = saldo > 0 ? "fiado-danger" : "fiado-zero";
     const badgeText = saldo > 0 ? `R$ ${saldo.toFixed(2).replace(".",",")} em aberto` : "R$ 0,00 — quitado";
@@ -4604,6 +4712,7 @@ async function renderFiadoAdmin() {
     const pedCount = (a.historico||[]).filter(h=>h.tipo==="pedido").length;
     return `<div class="fiado-client-card">
       <div class="fcc-header" onclick="toggleFiadoDetail('${a.id}')">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);min-width:24px;text-align:center;">${index + 1}</div>
         <div class="fcc-av">${initials}</div>
         <div style="flex:1;">
           <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
@@ -7364,6 +7473,15 @@ async function loadProducao() {
 // ═══════════════════════════════════════════════════════
 //  CLIENTES INATIVOS TOGGLE
 // ═══════════════════════════════════════════════════════
+// Toggle sort direction on column header click
+function setClientsSort(asc, desc) {
+  const sel = document.getElementById("clients-sort");
+  if (!sel) return;
+  // If already on asc, switch to desc; otherwise set asc
+  sel.value = sel.value === asc && desc ? desc : asc;
+  renderClients();
+}
+
 let _showInactive = false;
 
 function toggleInactiveFilter() {
