@@ -43,11 +43,11 @@
       document.addEventListener("DOMContentLoaded", () => document.body.appendChild(overlay));
     }
     console.error("Panillo: /api/config falhou —", e.message);
-    return; // encerra o módulo sem throw, preservando o JS do resto da página
+    // Não usa return (ilegal em module top-level) — o bloco abaixo só roda se cfg existir
   }
   // ────────────────────────────────────────────────────────────────────────────
 
-  const app  = initializeApp(cfg.firebase);
+  if (cfg) { // só inicializa se a config foi carregada com sucesso
   // Força HTTP long-polling para evitar erros QUIC em redes que bloqueiam o protocolo
   // (resolve ERR_QUIC_PROTOCOL_ERROR e ERR_NAME_NOT_RESOLVED no Firestore)
   const db = initializeFirestore(app, { experimentalForceLongPolling: true });
@@ -102,6 +102,7 @@
   };
 
   window.dispatchEvent(new Event("firebase-ready"));
+  } // end if (cfg)
 </script>
 
 <style>
