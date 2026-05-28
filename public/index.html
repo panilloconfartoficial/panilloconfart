@@ -2135,6 +2135,10 @@ img { max-width: 100%; display: block; }
         <label class="fl">Estoque mínimo (alerta)</label>
         <input class="fi" id="ing-min" type="number" placeholder="Ex: 500">
       </div>
+      <div class="fg">
+        <label class="fl">Data de validade (opcional)</label>
+        <input class="fi" id="ing-validade" type="date">
+      </div>
     </div>
     <div class="pm-footer">
       <button class="btn-back" onclick="closeIngModal()">Cancelar</button>
@@ -2218,10 +2222,22 @@ img { max-width: 100%; display: block; }
       <i class="ti ti-package sb-icon"></i>
       <span class="sb-label">Estoque PE</span>
     </div>
+    <div class="sb-item" onclick="showAdminSection('producao',this)">
+      <i class="ti ti-tool sb-icon"></i>
+      <span class="sb-label">Produção</span>
+    </div>
     <div class="sb-section">Financeiro</div>
     <div class="sb-item" onclick="showAdminSection('indicadores',this)">
       <i class="ti ti-chart-bar sb-icon"></i>
       <span class="sb-label">Indicadores</span>
+    </div>
+    <div class="sb-item" onclick="showAdminSection('metas',this)">
+      <i class="ti ti-target sb-icon"></i>
+      <span class="sb-label">Metas & Lucro</span>
+    </div>
+    <div class="sb-item" onclick="showAdminSection('fluxo',this)">
+      <i class="ti ti-arrows-exchange sb-icon"></i>
+      <span class="sb-label">Fluxo de Caixa</span>
     </div>
     <div class="sb-item" onclick="showAdminSection('suprimentos',this)">
       <i class="ti ti-report-money sb-icon"></i>
@@ -2529,7 +2545,14 @@ img { max-width: 100%; display: block; }
         <!-- Search + stats bar -->
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
           <input class="clients-search" id="clients-search" type="text" placeholder="🔍 Buscar por nome, WhatsApp..." oninput="renderClients()">
-          <span id="clients-count" style="font-size:12px;color:var(--muted);white-space:nowrap;"></span>
+          <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1.5px solid var(--border);border-radius:10px;padding:4px 10px;">
+            <span style="font-size:12px;color:var(--muted);">Inativos há mais de</span>
+            <input id="inactive-days" type="number" min="1" max="365" value="60" style="width:50px;border:none;outline:none;font-size:13px;font-weight:600;color:var(--teal-dark);text-align:center;">
+            <span style="font-size:12px;color:var(--muted);">dias</span>
+            <button onclick="renderClients()" style="background:var(--teal);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Ver</button>
+          </div>
+          <button onclick="toggleInactiveFilter()" id="btn-inactive-filter" style="background:#FDF6E8;color:#C8902A;border:1.5px solid #C8902A44;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">🔕 Ver inativos</button>
+          <span id="clients-count" style="font-size:12px;color:var(--muted);white-space:nowrap;margin-left:auto;"></span>
         </div>
         <div class="admin-card" style="padding:0;overflow:hidden;">
           <table class="clients-table">
@@ -2547,6 +2570,154 @@ img { max-width: 100%; display: block; }
             </thead>
             <tbody id="clients-tbody"></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── METAS & LUCRO ── -->
+    <div id="sec-metas" class="hidden">
+      <div class="admin-topbar">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+          <div class="admin-page-title">Metas & Lucro</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-sm-outline" onclick="metasSaveCurrent()" style="background:var(--teal);color:#fff;border-color:var(--teal);">💾 Salvar mês</button>
+        </div>
+      </div>
+      <div class="admin-content">
+        <!-- Meta do mês -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;" id="metas-input-grid">
+          <div class="admin-card" style="padding:20px;">
+            <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:12px;">🎯 Meta de Faturamento Mensal</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:14px;color:var(--muted);">R$</span>
+              <input id="meta-faturamento" type="number" min="0" step="100" placeholder="Ex: 3000"
+                style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;font-weight:600;color:var(--teal-dark);outline:none;"
+                oninput="metasCalc()">
+            </div>
+          </div>
+          <div class="admin-card" style="padding:20px;">
+            <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:12px;">💰 Meta de Lucro Mensal</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:14px;color:var(--muted);">R$</span>
+              <input id="meta-lucro" type="number" min="0" step="100" placeholder="Ex: 1500"
+                style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;font-weight:600;color:#0F6E56;outline:none;"
+                oninput="metasCalc()">
+            </div>
+          </div>
+          <div class="admin-card" style="padding:20px;">
+            <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:12px;">🏦 Meta Reserva da Empresa (%)</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input id="meta-reserva-pct" type="number" min="0" max="50" step="1" placeholder="Ex: 10"
+                style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;font-weight:600;color:#4B7FCC;outline:none;"
+                oninput="metasCalc()">
+              <span style="font-size:14px;color:var(--muted);">% do fat.</span>
+            </div>
+          </div>
+          <div class="admin-card" style="padding:20px;">
+            <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:12px;">⚙️ Custos Operacionais (%)</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input id="meta-overhead-local" type="number" min="0" max="100" step="1" placeholder="Ex: 20"
+                style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;font-weight:600;color:#C8902A;outline:none;"
+                oninput="metasCalc()">
+              <span style="font-size:14px;color:var(--muted);">% do fat.</span>
+            </div>
+          </div>
+        </div>
+        <!-- KPI projections -->
+        <div id="metas-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;"></div>
+        <!-- Progress bars -->
+        <div class="admin-card" style="padding:20px;margin-bottom:20px;" id="metas-progress-card">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px;">📊 Progresso do Mês Atual</div>
+          <div id="metas-progress"></div>
+        </div>
+        <!-- Weekly breakdown -->
+        <div class="admin-card" style="padding:20px;margin-bottom:20px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px;">📅 Meta Semanal (distribuição)</div>
+          <div id="metas-weekly"></div>
+        </div>
+        <!-- History -->
+        <div class="admin-card" style="padding:20px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px;">📁 Histórico de Metas</div>
+          <div id="metas-history"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FLUXO DE CAIXA ── -->
+    <div id="sec-fluxo" class="hidden">
+      <div class="admin-topbar">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+          <div class="admin-page-title">Fluxo de Caixa</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-sm-outline" onclick="loadFluxo('semana')" id="fluxo-btn-s">7 dias</button>
+          <button class="btn-sm-outline" id="fluxo-btn-m" style="background:var(--teal);color:#fff;border-color:var(--teal);" onclick="loadFluxo('mes')">30 dias</button>
+          <button class="btn-sm-outline" onclick="loadFluxo('ano')" id="fluxo-btn-a">12 meses</button>
+        </div>
+      </div>
+      <div class="admin-content">
+        <!-- Summary KPIs -->
+        <div id="fluxo-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;"></div>
+        <!-- Chart -->
+        <div class="admin-card" style="padding:20px;margin-bottom:20px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px;">💹 Entradas × Saídas × Reserva</div>
+          <div style="position:relative;">
+            <canvas id="fluxo-chart" height="200"></canvas>
+            <div id="fluxo-tooltip" class="ind-tooltip" style="display:none;"></div>
+          </div>
+        </div>
+        <!-- Daily breakdown table -->
+        <div class="admin-card" style="padding:0;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:var(--cream);">
+                <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Data</th>
+                <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Entradas</th>
+                <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Confirmado</th>
+                <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">A Receber</th>
+                <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Reserva Est.</th>
+                <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Lucro Est.</th>
+              </tr>
+            </thead>
+            <tbody id="fluxo-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PRODUÇÃO ── -->
+    <div id="sec-producao" class="hidden">
+      <div class="admin-topbar">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+          <div class="admin-page-title">Projeção de Produção</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-sm-outline" onclick="loadProducao()">↻ Atualizar</button>
+        </div>
+      </div>
+      <div class="admin-content">
+        <div class="admin-card" style="padding:16px;margin-bottom:16px;background:linear-gradient(90deg,#1B4332,#2D6A4F);color:#fff;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px;">📦 Como funciona</div>
+          <div style="font-size:12px;opacity:.85;line-height:1.6;">Exibe os ingredientes necessários para produzir todos os pedidos <strong>confirmados e prontos</strong> pendentes de entrega. Útil para planejar compras antes de produzir.</div>
+        </div>
+        <!-- Pedidos a produzir -->
+        <div class="admin-card" style="padding:20px;margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">🧁 Itens a Produzir</div>
+          <div id="producao-itens"></div>
+        </div>
+        <!-- Ingredientes necessários -->
+        <div class="admin-card" style="padding:20px;margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">🧪 Ingredientes Necessários</div>
+          <div id="producao-ingredientes"></div>
+        </div>
+        <!-- Validade de ingredientes -->
+        <div class="admin-card" style="padding:20px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;">⏰ Alertas de Validade</div>
+          <div id="producao-validade"></div>
         </div>
       </div>
     </div>
@@ -2651,6 +2822,7 @@ img { max-width: 100%; display: block; }
                   <th>Mínimo</th>
                   <th>Preço / unid.</th>
                   <th>Preço / g</th>
+                  <th>Validade</th>
                   <th>Situação</th>
                   <th></th>
                 </tr>
@@ -3173,6 +3345,9 @@ function showAdminSection(sec, el) {
   if (sec === "suprimentos") renderIngredients();
   if (sec === "ia")          renderIASection();
   if (sec === "indicadores") loadIndicadores("mes");
+  if (sec === "metas")       loadMetas();
+  if (sec === "fluxo")       loadFluxo();
+  if (sec === "producao")    loadProducao();
 }
 
 // ─── PRODUCTS ──────────────────────────────────────────
@@ -4865,17 +5040,29 @@ async function loadIngredients() {
 function renderIngredients() {
   const tbody = document.getElementById("ing-tbody");
   if (!tbody) return;
+  const today = new Date();
   tbody.innerHTML = allIngredients.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Nenhum ingrediente cadastrado. Clique em "+ Ingrediente".</td></tr>`
+    ? `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Nenhum ingrediente cadastrado. Clique em "+ Ingrediente".</td></tr>`
     : allIngredients.map(i => {
         const ok = i.estoque >= (i.min || 0);
         const pricePerG = i.unit === "kg" ? (i.preco/1000) : i.preco;
+        // Validade
+        let validadeHtml = `<span style="color:var(--muted);font-size:11px;">—</span>`;
+        if (i.validade) {
+          const vd = new Date(i.validade + "T12:00");
+          const diff = Math.ceil((vd - today)/(1000*60*60*24));
+          if (diff < 0) validadeHtml = `<span style="background:#FAECE7;color:#993C1D;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:600;">❌ Vencido</span>`;
+          else if (diff <= 3) validadeHtml = `<span style="background:#FDF6E8;color:#C8902A;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:600;">⚠️ ${diff}d</span>`;
+          else if (diff <= 7) validadeHtml = `<span style="background:#E1F5EE;color:#0F6E56;padding:2px 7px;border-radius:6px;font-size:11px;">✅ ${diff}d</span>`;
+          else validadeHtml = `<span style="font-size:12px;color:var(--muted);">${vd.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}</span>`;
+        }
         return `<tr>
           <td class="ing-name">${i.nome}</td>
           <td>${i.estoque} ${i.unit}</td>
           <td>${i.min || "—"} ${i.unit}</td>
           <td>R$ ${Number(i.preco||0).toFixed(2)} / ${i.unit}</td>
           <td>R$ ${pricePerG.toFixed(4)}</td>
+          <td>${validadeHtml}</td>
           <td><span class="${ok?'stock-ok':'stock-low'}">${ok?'OK':'Baixo'}</span></td>
           <td><div class="ing-actions">
             <button class="ing-act-btn" onclick="openIngModal('${i.id}')">Editar</button>
@@ -4933,15 +5120,18 @@ function openIngModal(id) {
   if (id) {
     const i = allIngredients.find(x => x.id === id);
     if (i) {
-      document.getElementById("ing-nome").value    = i.nome;
-      document.getElementById("ing-unit").value    = i.unit;
-      document.getElementById("ing-preco").value   = i.preco;
-      document.getElementById("ing-estoque").value = i.estoque;
-      document.getElementById("ing-min").value     = i.min || "";
+      document.getElementById("ing-nome").value     = i.nome;
+      document.getElementById("ing-unit").value     = i.unit;
+      document.getElementById("ing-preco").value    = i.preco;
+      document.getElementById("ing-estoque").value  = i.estoque;
+      document.getElementById("ing-min").value      = i.min || "";
+      const vd = document.getElementById("ing-validade");
+      if (vd) vd.value = i.validade || "";
       document.getElementById("ing-modal-title").textContent = "Editar ingrediente";
     }
   } else {
     ["ing-nome","ing-preco","ing-estoque","ing-min"].forEach(x => document.getElementById(x).value = "");
+    const vd = document.getElementById("ing-validade"); if (vd) vd.value = "";
     document.getElementById("ing-modal-title").textContent = "Novo ingrediente";
   }
   document.getElementById("ing-modal").classList.add("open");
@@ -4953,8 +5143,9 @@ async function saveIngredient() {
   const nome = document.getElementById("ing-nome").value.trim();
   const preco = parseFloat(document.getElementById("ing-preco").value);
   if (!nome || !preco) { showToast("Preencha nome e preço!"); return; }
+  const validade = document.getElementById("ing-validade")?.value || "";
   const data = {
-    nome, preco,
+    nome, preco, validade,
     unit:    document.getElementById("ing-unit").value,
     estoque: parseFloat(document.getElementById("ing-estoque").value) || 0,
     min:     parseFloat(document.getElementById("ing-min").value) || 0
@@ -6720,6 +6911,466 @@ async function submitVendaPresencial() {
     showToast("Erro ao registrar venda", "error");
   }
 }
+
+// ═══════════════════════════════════════════════════════
+//  METAS & LUCRO
+// ═══════════════════════════════════════════════════════
+async function loadMetas() {
+  // Load saved meta for current month
+  const key = `metas_${new Date().getFullYear()}_${new Date().getMonth()+1}`;
+  let saved = {};
+  try {
+    const docs = await fbGet("metas");
+    saved = docs.find(d => d.key === key) || {};
+  } catch {}
+  // Also try localStorage fallback
+  const local = JSON.parse(localStorage.getItem("panillo-metas-" + key) || "{}");
+  const meta = { ...local, ...saved };
+
+  // Load config overhead
+  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  const overheadPct = Number(cfg.overhead || 20);
+
+  // Fill inputs
+  document.getElementById("meta-faturamento").value   = meta.faturamento || "";
+  document.getElementById("meta-lucro").value         = meta.lucro || "";
+  document.getElementById("meta-reserva-pct").value   = meta.reservaPct || "";
+  document.getElementById("meta-overhead-local").value= meta.overhead || overheadPct;
+
+  metasCalc();
+  metasLoadHistory();
+}
+
+async function metasCalc() {
+  const metaFat   = Number(document.getElementById("meta-faturamento")?.value) || 0;
+  const metaLucro = Number(document.getElementById("meta-lucro")?.value) || 0;
+  const reservaPct= Number(document.getElementById("meta-reserva-pct")?.value) || 0;
+  const overhead  = Number(document.getElementById("meta-overhead-local")?.value) || 20;
+
+  // Current month actual
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  let orders = allOrders;
+  if (!orders.length) { try { orders = await fbGet("orders"); allOrders = orders; } catch {} }
+  const activeStatus = ["confirmado","pronto","entregue"];
+  const monthOrders = orders.filter(o => {
+    if (!activeStatus.includes(o.status)) return false;
+    const ts = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000) : new Date(o.dataRetirada+"T12:00");
+    return ts >= monthStart;
+  });
+  const fatAtual = monthOrders.reduce((s,o) => s + Number(o.total||0), 0);
+  const lucroAtual = fatAtual * (1 - overhead/100);
+  const reservaAtual = fatAtual * (reservaPct/100);
+
+  // Projections
+  const dayOfMonth = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const projFat = dayOfMonth > 0 ? (fatAtual / dayOfMonth) * daysInMonth : 0;
+  const projLucro = projFat * (1 - overhead/100);
+  const projReserva = projFat * (reservaPct/100);
+  const projAnual = projFat * 12;
+
+  const fmt = v => "R$ " + Number(v).toFixed(2).replace(".",",");
+  const pct = metaFat > 0 ? Math.min(100, (fatAtual/metaFat)*100) : 0;
+  const daysLeft = daysInMonth - dayOfMonth;
+
+  // KPIs
+  document.getElementById("metas-kpis").innerHTML = `
+    <div class="admin-card" style="padding:16px;text-align:center;">
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Faturado este mês</div>
+      <div style="font-size:22px;font-weight:700;color:var(--teal-dark);">${fmt(fatAtual)}</div>
+      <div style="font-size:11px;color:var(--muted);">${monthOrders.length} pedidos</div>
+    </div>
+    <div class="admin-card" style="padding:16px;text-align:center;">
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Lucro estimado</div>
+      <div style="font-size:22px;font-weight:700;color:#0F6E56;">${fmt(lucroAtual)}</div>
+      <div style="font-size:11px;color:var(--muted);">Overhead: ${overhead}%</div>
+    </div>
+    <div class="admin-card" style="padding:16px;text-align:center;">
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Reserva constituída</div>
+      <div style="font-size:22px;font-weight:700;color:#4B7FCC;">${fmt(reservaAtual)}</div>
+      <div style="font-size:11px;color:var(--muted);">${reservaPct}% do faturamento</div>
+    </div>
+    <div class="admin-card" style="padding:16px;text-align:center;">
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Projeção mensal</div>
+      <div style="font-size:22px;font-weight:700;color:var(--gold-dark);">${fmt(projFat)}</div>
+      <div style="font-size:11px;color:var(--muted);">${daysLeft} dias restantes</div>
+    </div>
+    <div class="admin-card" style="padding:16px;text-align:center;">
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Projeção anual</div>
+      <div style="font-size:22px;font-weight:700;color:var(--teal-dark);">${fmt(projAnual)}</div>
+      <div style="font-size:11px;color:var(--muted);">lucro proj. ${fmt(projLucro*12)}</div>
+    </div>`;
+
+  // Progress bars
+  const progressHtml = (label, atual, meta, color) => {
+    const p = meta > 0 ? Math.min(100,(atual/meta)*100) : 0;
+    const diff = atual - meta;
+    return `<div style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+        <span style="font-size:12px;font-weight:600;color:var(--text);">${label}</span>
+        <span style="font-size:12px;color:var(--muted);">${fmt(atual)} / ${fmt(meta)} <b style="color:${diff>=0?'#0F6E56':'#993C1D'}">(${diff>=0?'+':''}${fmt(diff)})</b></span>
+      </div>
+      <div style="height:12px;background:var(--cream-dark);border-radius:8px;overflow:hidden;">
+        <div style="height:100%;width:${p.toFixed(1)}%;background:${color};border-radius:8px;transition:width .4s;"></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:3px;">${p.toFixed(1)}% da meta</div>
+    </div>`;
+  };
+  document.getElementById("metas-progress").innerHTML =
+    (metaFat ? progressHtml("🎯 Faturamento", fatAtual, metaFat, "var(--teal)") : "") +
+    (metaLucro ? progressHtml("💰 Lucro", lucroAtual, metaLucro, "#0F6E56") : "") +
+    (metaFat && reservaPct ? progressHtml("🏦 Reserva", reservaAtual, metaFat*(reservaPct/100), "#4B7FCC") : "") +
+    (!metaFat && !metaLucro ? `<div style="color:var(--muted);font-size:13px;">Defina as metas acima para ver o progresso.</div>` : "");
+
+  // Weekly breakdown
+  const weeksInMonth = Math.ceil(daysInMonth / 7);
+  const metaSemanal = metaFat / weeksInMonth;
+  const currentWeek = Math.ceil(dayOfMonth / 7);
+  let weeklyHtml = "";
+  for (let w = 1; w <= weeksInMonth; w++) {
+    const wStart = new Date(now.getFullYear(), now.getMonth(), (w-1)*7+1);
+    const wEnd   = new Date(now.getFullYear(), now.getMonth(), Math.min(w*7, daysInMonth));
+    const wFat = monthOrders.filter(o => {
+      const ts = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000) : new Date(o.dataRetirada+"T12:00");
+      return ts >= wStart && ts <= wEnd;
+    }).reduce((s,o) => s+Number(o.total||0), 0);
+    const isCurrent = w === currentWeek;
+    const wp = metaSemanal > 0 ? Math.min(100,(wFat/metaSemanal)*100) : 0;
+    weeklyHtml += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;${isCurrent?'background:var(--cream);padding:8px;border-radius:8px;':''}">
+      <span style="font-size:12px;font-weight:600;color:var(--text);min-width:60px;">Semana ${w}${isCurrent?' <span style="background:var(--teal);color:#fff;border-radius:4px;padding:1px 5px;font-size:9px;">atual</span>':''}</span>
+      <div style="flex:1;height:10px;background:var(--cream-dark);border-radius:6px;overflow:hidden;">
+        <div style="height:100%;width:${wp.toFixed(0)}%;background:${w<currentWeek?'var(--teal-dark)':isCurrent?'var(--teal)':'#ccc'};border-radius:6px;transition:width .4s;"></div>
+      </div>
+      <span style="font-size:12px;color:var(--muted);min-width:90px;text-align:right;">${fmt(wFat)} / ${fmt(metaSemanal)}</span>
+    </div>`;
+  }
+  document.getElementById("metas-weekly").innerHTML = metaFat ? weeklyHtml : `<div style="color:var(--muted);font-size:13px;">Defina a meta mensal para ver a distribuição semanal.</div>`;
+}
+
+async function metasSaveCurrent() {
+  const now = new Date();
+  const key = `metas_${now.getFullYear()}_${now.getMonth()+1}`;
+  const monthLabel = now.toLocaleDateString("pt-BR", { month:"long", year:"numeric" });
+  const metaData = {
+    key, monthLabel,
+    faturamento:  Number(document.getElementById("meta-faturamento")?.value) || 0,
+    lucro:        Number(document.getElementById("meta-lucro")?.value) || 0,
+    reservaPct:   Number(document.getElementById("meta-reserva-pct")?.value) || 0,
+    overhead:     Number(document.getElementById("meta-overhead-local")?.value) || 20,
+    savedAt: new Date().toISOString()
+  };
+  // Save to Firebase
+  try {
+    const docs = await fbGet("metas");
+    const existing = docs.find(d => d.key === key);
+    if (existing) await fbUpdate("metas", existing.id, metaData);
+    else await fbAdd("metas", metaData);
+    showToast("Meta do mês salva!", "success");
+  } catch {
+    localStorage.setItem("panillo-metas-" + key, JSON.stringify(metaData));
+    showToast("Meta salva localmente!", "success");
+  }
+  metasLoadHistory();
+}
+
+async function metasLoadHistory() {
+  const el = document.getElementById("metas-history");
+  if (!el) return;
+  let history = [];
+  try { history = await fbGet("metas"); } catch {
+    // fallback localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("panillo-metas-")) {
+        try { history.push(JSON.parse(localStorage.getItem(k))); } catch {}
+      }
+    }
+  }
+  history.sort((a,b) => (b.key||"").localeCompare(a.key||""));
+  if (!history.length) { el.innerHTML = `<div style="color:var(--muted);font-size:13px;">Nenhuma meta salva ainda. Defina e clique em "Salvar mês".</div>`; return; }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr style="background:var(--cream);">
+      <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Mês</th>
+      <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Meta Fat.</th>
+      <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Meta Lucro</th>
+      <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Reserva %</th>
+      <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;">Overhead %</th>
+    </tr></thead>
+    <tbody>${history.map(h => `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:10px 12px;font-size:13px;font-weight:600;color:var(--teal-dark);">${h.monthLabel||h.key}</td>
+      <td style="padding:10px 12px;text-align:right;font-size:13px;">R$ ${Number(h.faturamento||0).toFixed(2).replace(".",",")}</td>
+      <td style="padding:10px 12px;text-align:right;font-size:13px;color:#0F6E56;">R$ ${Number(h.lucro||0).toFixed(2).replace(".",",")}</td>
+      <td style="padding:10px 12px;text-align:right;font-size:13px;color:#4B7FCC;">${h.reservaPct||0}%</td>
+      <td style="padding:10px 12px;text-align:right;font-size:13px;color:#C8902A;">${h.overhead||20}%</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  FLUXO DE CAIXA
+// ═══════════════════════════════════════════════════════
+let _fluxoMode = "mes";
+
+async function loadFluxo(mode = "mes") {
+  _fluxoMode = mode;
+  ["s","m","a"].forEach(k => {
+    const b = document.getElementById("fluxo-btn-"+k);
+    if (!b) return;
+    b.style.background = ""; b.style.color = ""; b.style.borderColor = "";
+  });
+  const btnMap = {semana:"s", mes:"m", ano:"a"};
+  const btn = document.getElementById("fluxo-btn-"+btnMap[mode]);
+  if (btn) { btn.style.background="var(--teal)"; btn.style.color="#fff"; btn.style.borderColor="var(--teal)"; }
+
+  let orders = allOrders;
+  if (!orders.length) { try { orders = await fbGet("orders"); allOrders = orders; } catch { orders = []; } }
+
+  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  const overhead = Number(cfg.overhead || 20) / 100;
+  const now = new Date();
+  const days = mode === "semana" ? 7 : mode === "mes" ? 30 : 365;
+  const cutoff = new Date(now); cutoff.setDate(now.getDate() - days);
+
+  // Load metas for reserva %
+  let reservaPct = 0;
+  try {
+    const metaDocs = await fbGet("metas");
+    const curKey = `metas_${now.getFullYear()}_${now.getMonth()+1}`;
+    const curMeta = metaDocs.find(d => d.key === curKey);
+    if (curMeta) reservaPct = Number(curMeta.reservaPct || 0) / 100;
+  } catch {}
+
+  const active = ["confirmado","pronto","entregue"];
+  const filtered = orders.filter(o => {
+    if (!active.includes(o.status)) return false;
+    const ts = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000) : new Date(o.dataRetirada+"T12:00");
+    return ts >= cutoff;
+  });
+
+  // Buckets
+  const buckets = {};
+  for (let i = days-1; i >= 0; i--) {
+    const d = new Date(now); d.setDate(now.getDate()-i);
+    const k = d.toISOString().split("T")[0];
+    buckets[k] = { entradas:0, confirmado:0, aReceber:0, pedidos:0 };
+  }
+  filtered.forEach(o => {
+    const ts = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000) : new Date(o.dataRetirada+"T12:00");
+    const k = ts.toISOString().split("T")[0];
+    if (!buckets[k]) return;
+    buckets[k].entradas += Number(o.total||0);
+    buckets[k].pedidos++;
+    if (o.pagamentoConfirmado) buckets[k].confirmado += Number(o.total||0);
+    else buckets[k].aReceber += Number(o.total||0);
+  });
+
+  const labels = Object.keys(buckets);
+  const entrData = labels.map(k => buckets[k].entradas);
+  const recData  = labels.map(k => buckets[k].confirmado);
+  const arvData  = labels.map(k => buckets[k].aReceber);
+
+  const totalEnt = filtered.reduce((s,o) => s+Number(o.total||0), 0);
+  const totalRec = filtered.filter(o=>o.pagamentoConfirmado).reduce((s,o)=>s+Number(o.total||0),0);
+  const totalArec = totalEnt - totalRec;
+  const totalLucro = totalEnt * (1-overhead);
+  const totalReserva = totalEnt * reservaPct;
+
+  const fmt = v => "R$ " + Number(v).toFixed(2).replace(".",",");
+
+  document.getElementById("fluxo-kpis").innerHTML = [
+    ["💰 Total Entradas", fmt(totalEnt), "var(--teal-dark)"],
+    ["✅ Confirmado", fmt(totalRec), "#0F6E56"],
+    ["⏳ A Receber", fmt(totalArec), "#C8902A"],
+    ["📈 Lucro Est.", fmt(totalLucro), "var(--teal)"],
+    ["🏦 Reserva Est.", fmt(totalReserva), "#4B7FCC"],
+  ].map(([lbl,val,color]) => `<div class="admin-card" style="padding:14px;text-align:center;">
+    <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">${lbl}</div>
+    <div style="font-size:18px;font-weight:700;color:${color};">${val}</div>
+  </div>`).join("");
+
+  _drawLineChart("fluxo-chart", "fluxo-tooltip", labels, [
+    { label:"Entradas",   data: entrData, color:"var(--teal)" },
+    { label:"Confirmado", data: recData,  color:"#0F6E56" },
+    { label:"A Receber",  data: arvData,  color:"#C8902A" },
+  ], v => "R$ "+v.toFixed(2).replace(".",","));
+
+  // Table — only rows with activity, newest first
+  const tableRows = labels.slice().reverse().filter(k => buckets[k].entradas > 0).map(k => {
+    const b = buckets[k];
+    const d = new Date(k+"T12:00");
+    const reservaVal = b.entradas * reservaPct;
+    const lucroVal   = b.entradas * (1-overhead);
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:10px 14px;font-size:12px;">${d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}</td>
+      <td style="padding:10px 14px;text-align:right;font-size:12px;font-weight:600;color:var(--teal-dark);">${fmt(b.entradas)}</td>
+      <td style="padding:10px 14px;text-align:right;font-size:12px;color:#0F6E56;">${fmt(b.confirmado)}</td>
+      <td style="padding:10px 14px;text-align:right;font-size:12px;color:#C8902A;">${fmt(b.aReceber)}</td>
+      <td style="padding:10px 14px;text-align:right;font-size:12px;color:#4B7FCC;">${fmt(reservaVal)}</td>
+      <td style="padding:10px 14px;text-align:right;font-size:12px;color:var(--teal);">${fmt(lucroVal)}</td>
+    </tr>`;
+  });
+  document.getElementById("fluxo-tbody").innerHTML = tableRows.length
+    ? tableRows.join("")
+    : `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted);">Nenhuma movimentação no período</td></tr>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  PRODUÇÃO
+// ═══════════════════════════════════════════════════════
+async function loadProducao() {
+  let orders = allOrders;
+  if (!orders.length) { try { orders = await fbGet("orders"); allOrders = orders; } catch {} }
+  let ings = allIngredients;
+  if (!ings.length) { try { ings = await fbGet("ingredients"); allIngredients = ings; } catch {} }
+  let prods = allProducts;
+  if (!prods.length) { try { prods = await fbGet("products"); allProducts = prods; } catch {} }
+
+  const pending = orders.filter(o => ["confirmado","pronto"].includes(o.status));
+
+  // Aggregate items to produce
+  const itemCount = {};
+  pending.forEach(o => (o.itens||[]).forEach(i => {
+    itemCount[i.nome] = (itemCount[i.nome]||0) + (i.qty||0);
+  }));
+
+  const itensEl = document.getElementById("producao-itens");
+  if (!Object.keys(itemCount).length) {
+    itensEl.innerHTML = `<div style="color:var(--muted);font-size:13px;">Nenhum pedido confirmado pendente de produção.</div>`;
+  } else {
+    itensEl.innerHTML = Object.entries(itemCount).sort((a,b)=>b[1]-a[1]).map(([nome, qty]) =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:13px;font-weight:600;color:var(--text);">${nome}</span>
+        <span style="background:var(--teal);color:#fff;padding:3px 12px;border-radius:20px;font-size:13px;font-weight:700;">${qty} un.</span>
+      </div>`).join("");
+  }
+
+  // Aggregate ingredients needed
+  const ingNeeded = {};
+  pending.forEach(o => (o.itens||[]).forEach(item => {
+    const prod = prods.find(p => p.nome === item.nome || p.id === item.prodId);
+    if (!prod?.ingredientes) return;
+    prod.ingredientes.forEach(pi => {
+      ingNeeded[pi.ingId] = (ingNeeded[pi.ingId]||0) + pi.grams * (item.qty||0);
+    });
+  }));
+
+  const ingsEl = document.getElementById("producao-ingredientes");
+  if (!Object.keys(ingNeeded).length) {
+    ingsEl.innerHTML = `<div style="color:var(--muted);font-size:13px;">Cadastre ingredientes nos produtos para ver a projeção.</div>`;
+  } else {
+    ingsEl.innerHTML = Object.entries(ingNeeded).map(([ingId, grams]) => {
+      const ing = ings.find(i => i.id === ingId);
+      if (!ing) return "";
+      const disponivel = ing.unit === "kg" ? (ing.estoque||0)*1000 : (ing.estoque||0);
+      const falta = grams - disponivel;
+      const ok = falta <= 0;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);">${ing.nome}</div>
+          <div style="font-size:11px;color:var(--muted);">Necessário: ${grams}g · Disponível: ${disponivel}g</div>
+        </div>
+        <span style="background:${ok?'#E1F5EE':'#FAECE7'};color:${ok?'#0F6E56':'#993C1D'};padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;">
+          ${ok ? '✅ OK' : `⚠️ Falta ${Math.abs(falta).toFixed(0)}g`}
+        </span>
+      </div>`;
+    }).filter(Boolean).join("") || `<div style="color:var(--muted);font-size:13px;">Nenhum ingrediente necessário encontrado.</div>`;
+  }
+
+  // Expiry alerts
+  const today = new Date();
+  const expiring = ings.filter(i => {
+    if (!i.validade) return false;
+    const diff = Math.ceil((new Date(i.validade+"T12:00") - today)/(1000*60*60*24));
+    return diff <= 14;
+  }).sort((a,b) => new Date(a.validade) - new Date(b.validade));
+
+  const valEl = document.getElementById("producao-validade");
+  valEl.innerHTML = expiring.length ? expiring.map(i => {
+    const diff = Math.ceil((new Date(i.validade+"T12:00") - today)/(1000*60*60*24));
+    const expired = diff < 0;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${i.nome}</div>
+        <div style="font-size:11px;color:var(--muted);">Validade: ${new Date(i.validade+"T12:00").toLocaleDateString("pt-BR")}</div>
+      </div>
+      <span style="background:${expired?'#FAECE7':'#FDF6E8'};color:${expired?'#993C1D':'#C8902A'};padding:4px 10px;border-radius:8px;font-size:12px;font-weight:700;">
+        ${expired ? '❌ Vencido' : `⚠️ ${diff}d`}
+      </span>
+    </div>`;
+  }).join("") : `<div style="color:#0F6E56;font-size:13px;">✅ Todos os ingredientes dentro da validade</div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CLIENTES INATIVOS TOGGLE
+// ═══════════════════════════════════════════════════════
+let _showInactive = false;
+
+function toggleInactiveFilter() {
+  _showInactive = !_showInactive;
+  const btn = document.getElementById("btn-inactive-filter");
+  if (btn) {
+    btn.textContent = _showInactive ? "👥 Ver todos" : "🔕 Ver inativos";
+    btn.style.background = _showInactive ? "#FAECE7" : "#FDF6E8";
+    btn.style.color = _showInactive ? "#993C1D" : "#C8902A";
+    btn.style.borderColor = _showInactive ? "#993C1D44" : "#C8902A44";
+  }
+  renderClients();
+}
+
+// ── Patch renderClients to support inactive filter ──
+const _renderClientsOriginal = renderClients;
+renderClients = async function() {
+  if (!_showInactive) return _renderClientsOriginal();
+
+  let clients = allClients;
+  if (!clients.length) { try { clients = await fbGet("clients"); allClients = clients; } catch {} }
+  let orders = allOrders;
+  if (!orders.length) { try { orders = await fbGet("orders"); allOrders = orders; } catch {} }
+
+  const days = Number(document.getElementById("inactive-days")?.value) || 60;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+
+  const inactive = clients.filter(c => {
+    const clientOrders = orders.filter(o => (o.cliente?.wpp||"").replace(/\D/g,"") === (c.wpp||"").replace(/\D/g,""));
+    if (!clientOrders.length) return true; // never ordered
+    const lastOrder = clientOrders.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0))[0];
+    const lastDate = lastOrder.createdAt?.seconds ? new Date(lastOrder.createdAt.seconds*1000) : new Date(lastOrder.dataRetirada+"T12:00");
+    return lastDate < cutoff;
+  });
+
+  const countEl = document.getElementById("clients-count");
+  if (countEl) countEl.textContent = `${inactive.length} cliente(s) inativo(s) há mais de ${days} dias`;
+
+  const tbody = document.getElementById("clients-tbody");
+  tbody.innerHTML = inactive.length === 0
+    ? `<tr><td colspan="9" style="text-align:center;padding:24px;color:#0F6E56;font-weight:600;">✅ Nenhum cliente inativo há mais de ${days} dias!</td></tr>`
+    : inactive.map(c => {
+        const clientOrders = orders.filter(o => (o.cliente?.wpp||"").replace(/\D/g,"") === (c.wpp||"").replace(/\D/g,""));
+        const lastOrder = clientOrders.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0))[0];
+        const lastDate = lastOrder ? (lastOrder.createdAt?.seconds ? new Date(lastOrder.createdAt.seconds*1000) : new Date(lastOrder.dataRetirada+"T12:00")) : null;
+        const diffDays = lastDate ? Math.floor((new Date()-lastDate)/(1000*60*60*24)) : 999;
+        const idSafe = (c.id||"").replace(/'/g,"\\'");
+        const wppSafe = (c.wpp||"").replace(/\D/g,"");
+        const msg = encodeURIComponent(`Olá, ${c.nome?.split(" ")[0] || ""}! 😊 Sentimos sua falta na Panillo! Que tal fazer um pedido de cookies artesanais? Confira nosso cardápio: ${window.location.origin}`);
+        return `<tr>
+          <td><div class="client-av" style="background:#C8902A;">${(c.nome||"?").substring(0,2).toUpperCase()}</div></td>
+          <td class="client-name">${c.nome||"—"}</td>
+          <td>${c.wpp||"—"}</td>
+          <td style="font-size:12px;color:#993C1D;font-weight:600;">${lastDate ? lastDate.toLocaleDateString("pt-BR") : "Nunca pediu"}</td>
+          <td style="text-align:center;font-weight:700;color:#993C1D;">${diffDays === 999 ? "—" : diffDays+"d"}</td>
+          <td>${c.pedidos||0}</td>
+          <td>R$ ${Number(c.totalGasto||0).toFixed(2).replace(".",",")}</td>
+          <td>—</td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              ${c.wpp ? `<a href="https://wa.me/55${wppSafe}?text=${msg}" target="_blank" style="background:#25D366;color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;">💬 Reativar</a>` : ""}
+              <button class="pay-confirm-btn" onclick="openClientDetail('${idSafe}')">📋 Ver</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join("");
+};
 </script>
 
 <style>
