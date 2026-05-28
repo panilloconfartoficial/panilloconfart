@@ -793,6 +793,32 @@ img { max-width: 100%; display: block; }
 .ind-tooltip { position:absolute;background:rgba(20,40,35,.92);color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;pointer-events:none;white-space:nowrap;z-index:10;line-height:1.6;box-shadow:0 4px 16px rgba(0,0,0,.2); }
 @media(max-width:700px){.ind-charts-grid{grid-template-columns:1fr!important;}}
 
+/* ─── CLIENT DETAIL MODAL ─── */
+.client-detail-overlay { position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s; }
+.client-detail-overlay.open { opacity:1;pointer-events:all; }
+.client-detail-box { background:#fff;border-radius:18px;width:100%;max-width:680px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.18); }
+.client-detail-header { padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px; }
+.client-detail-av { width:52px;height:52px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0; }
+.client-detail-body { overflow-y:auto;padding:20px 24px; }
+.client-field-grid { display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px; }
+.client-field { display:flex;flex-direction:column;gap:5px; }
+.client-field label { font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px; }
+.client-field input, .client-field select, .client-field textarea { padding:9px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;color:var(--text);background:#fff;transition:border-color .15s; }
+.client-field input:focus, .client-field select:focus, .client-field textarea:focus { border-color:var(--teal);outline:none; }
+.client-field textarea { resize:vertical;min-height:60px; }
+
+/* ─── BIRTHDAY ALERTS ─── */
+.bday-alert-bar { background:linear-gradient(90deg,#2D6A4F,#1B4332);border-radius:12px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;animation:bdayPulse 2s ease-in-out infinite; }
+@keyframes bdayPulse { 0%,100%{box-shadow:0 0 0 0 rgba(232,184,75,.3)} 50%{box-shadow:0 0 0 8px rgba(232,184,75,0)} }
+.bday-alert-today { background:linear-gradient(90deg,#7B3F00,#A0522D) !important; }
+.bday-alert-close { background:none;border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:18px;margin-left:auto;flex-shrink:0; }
+.bday-alert-bar .bday-alert-msg { font-size:13px;font-weight:500;color:#fff;flex:1; }
+.bday-alerts-wrap { margin-bottom:8px; }
+
+/* ─── CLIENTS TABLE improvements ─── */
+.clients-search { flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text);background:#fff;outline:none; }
+.clients-search:focus { border-color:var(--teal); }
+
 /* ── pagination ── */
 .pagination { display:flex; gap:6px; align-items:center; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
 .pg-btn { background:var(--surface); border:1px solid var(--border); color:var(--text-mid); padding:5px 11px; border-radius:8px; font-size:12px; cursor:pointer; transition:background .15s; }
@@ -1473,12 +1499,31 @@ img { max-width: 100%; display: block; }
 }
 
 @media (max-width: 900px) {
-  /* mostra bottom nav somente dentro do admin */
+  /* mostra bottom nav somente dentro do admin EM MOBILE */
   .admin-page.active ~ .mob-bottom-nav,
   .mob-bottom-nav.admin-visible {
     display: flex;
   }
 }
+
+/* Sidebar colapsável no desktop */
+.admin-sidebar.collapsed {
+  width: 60px;
+  overflow: hidden;
+}
+.admin-sidebar.collapsed .sb-brand,
+.admin-sidebar.collapsed .sb-label,
+.admin-sidebar.collapsed .sb-section,
+.admin-sidebar.collapsed .sb-badge,
+.admin-sidebar.collapsed .sb-exit span,
+.admin-sidebar.collapsed .sb-divider {
+  display: none;
+}
+.admin-sidebar.collapsed .sb-item { padding: 12px; justify-content: center; }
+.admin-sidebar.collapsed .sb-icon { font-size: 18px; }
+.admin-sidebar.collapsed .sidebar-logo-wrap { justify-content: center; padding: 16px 0; }
+.admin-sidebar.collapsed .sb-exit { justify-content: center; padding: 16px 0; }
+.admin-sidebar { transition: width .2s ease; }
 </style>
 </head>
 <body>
@@ -2147,7 +2192,7 @@ img { max-width: 100%; display: block; }
   <!-- SIDEBAR -->
   <aside class="admin-sidebar">
     <div class="sidebar-logo-wrap">
-      <div class="sb-logo-c">P</div>
+      <div class="sb-logo-c" onclick="toggleAdminSidebar()" title="Recolher/expandir menu" style="cursor:pointer;flex-shrink:0;">P</div>
       <span class="sb-brand">Panillo</span>
     </div>
     <div class="sb-section">Geral</div>
@@ -2479,6 +2524,13 @@ img { max-width: 100%; display: block; }
         </div>
       </div>
       <div class="admin-content">
+        <!-- Birthday alerts -->
+        <div id="bday-alerts-wrap" class="bday-alerts-wrap"></div>
+        <!-- Search + stats bar -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <input class="clients-search" id="clients-search" type="text" placeholder="🔍 Buscar por nome, WhatsApp..." oninput="renderClients()">
+          <span id="clients-count" style="font-size:12px;color:var(--muted);white-space:nowrap;"></span>
+        </div>
         <div class="admin-card" style="padding:0;overflow:hidden;">
           <table class="clients-table">
             <thead>
@@ -2491,7 +2543,7 @@ img { max-width: 100%; display: block; }
                 <th>Total gasto</th>
                 <th>Favorito</th>
                 <th>Fiado</th>
-                <th></th>
+                <th>Ações</th>
             </thead>
             <tbody id="clients-tbody"></tbody>
           </table>
@@ -3005,6 +3057,14 @@ window.addEventListener("firebase-ready", () => {
     // allOrders e allStock já foram populados pelas funções acima;
     // aguarda um tick para garantir que estejam prontos antes de reconciliar
     setTimeout(reconcileStock, 1500);
+    // Load clients for birthday alerts (background)
+    setTimeout(async () => {
+      try {
+        const clients = await fbGet("clients");
+        allClients = clients;
+        renderBdayAlerts(clients);
+      } catch {}
+    }, 2000);
   });
 });
 
@@ -4063,41 +4123,63 @@ async function renderClients() {
   if (!allFiadoAccounts || allFiadoAccounts.length === 0) {
     try { allFiadoAccounts = await fbGet("fiadoAccounts"); } catch { allFiadoAccounts = []; }
   }
+
+  // Birthday alerts
+  renderBdayAlerts(clients);
+
+  // Search filter
+  const q = (document.getElementById("clients-search")?.value || "").toLowerCase();
+  const filtered = q
+    ? clients.filter(c => (c.nome||"").toLowerCase().includes(q) || (c.wpp||"").includes(q))
+    : clients;
+
+  const countEl = document.getElementById("clients-count");
+  if (countEl) countEl.textContent = `${filtered.length} cliente(s)`;
+
   const today = new Date();
   const tbody = document.getElementById("clients-tbody");
-  tbody.innerHTML = clients.length === 0
-    ? `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Nenhum cliente cadastrado ainda</td></tr>`
-    : clients.map(c => {
+  tbody.innerHTML = filtered.length === 0
+    ? `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted);">Nenhum cliente encontrado</td></tr>`
+    : filtered.map(c => {
+        // Birthday badge
         let bdayHtml = "—";
-        let soon = false;
+        let bdayUrgency = "";
         if (c.bday) {
           const bd = new Date(c.bday + "T12:00");
           const bdThis = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
           const diff = Math.ceil((bdThis - today)/(1000*60*60*24));
-          soon = diff >= 0 && diff <= 14;
-          bdayHtml = `<span class="bday-badge${soon?' bday-soon':''}">${bd.toLocaleDateString("pt-BR",{day:"2-digit",month:"long"})}${soon?' 🎂':''}</span>`;
+          const diffAdj = diff < 0 ? diff + 365 : diff;
+          const label = diffAdj === 0 ? "🎉 Hoje!" : diffAdj === 1 ? "Amanhã" : diffAdj <= 5 ? `em ${diffAdj} dias` : "";
+          bdayUrgency = diffAdj <= 5 ? "bday-soon" : diffAdj <= 14 ? "bday-ok" : "";
+          bdayHtml = `<span class="bday-badge ${bdayUrgency}" style="font-size:12px;">${bd.toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}${label ? ` · <b>${label}</b>` : ""}</span>`;
         }
-        // Badge de fiado
-        const fiadoAcc = allFiadoAccounts.find(a => a.clientWpp === c.wpp);
+        // Fiado badge
+        const fiadoAcc = allFiadoAccounts.find(a => a.clientWpp?.replace(/\D/g,"") === (c.wpp||"").replace(/\D/g,""));
         let fiadoHtml;
         if (fiadoAcc && fiadoAcc.autorizado) {
           const saldo = Number(fiadoAcc.saldo||0).toFixed(2).replace(".",",");
-          fiadoHtml = `<span style="display:inline-flex;align-items:center;gap:4px;background:#E1F5EE;color:#085041;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:500;">✅ Ativo<span style="color:#aaa;font-weight:400;">· R$${saldo}</span></span>`;
+          fiadoHtml = `<span style="display:inline-flex;align-items:center;gap:4px;background:#E1F5EE;color:#085041;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:500;">✅ R$${saldo}</span>`;
         } else if (fiadoAcc && !fiadoAcc.autorizado) {
-          fiadoHtml = `<span style="background:#FAECE7;color:#993C1D;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:500;">⛔ Revogado</span>`;
+          fiadoHtml = `<span style="background:#FAECE7;color:#993C1D;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:500;">⛔</span>`;
         } else {
-          fiadoHtml = `<span style="background:var(--cream-dark);color:var(--muted);border-radius:8px;padding:3px 9px;font-size:11px;">—</span>`;
+          fiadoHtml = `<span style="color:var(--muted);font-size:11px;">—</span>`;
         }
+        const idSafe = (c.id||"").replace(/'/g,"\\'");
         return `<tr>
           <td><div class="client-av">${(c.nome||"?").substring(0,2).toUpperCase()}</div></td>
-          <td class="client-name">${c.nome||"—"}</td>
-          <td>${c.wpp||"—"}</td>
+          <td class="client-name">${c.nome||"—"}${c.obs?`<br><span style="font-size:10px;color:var(--muted);">${c.obs.substring(0,40)}</span>`:""}</td>
+          <td><a href="https://wa.me/55${(c.wpp||"").replace(/\D/g,"")}" target="_blank" style="color:var(--teal);text-decoration:none;">${c.wpp||"—"}</a></td>
           <td>${bdayHtml}</td>
-          <td>${c.pedidos||0}</td>
+          <td style="text-align:center;">${c.pedidos||0}</td>
           <td>R$ ${Number(c.totalGasto||0).toFixed(2).replace(".",",")}</td>
           <td style="font-size:12px;">${c.favorito||"—"}</td>
           <td>${fiadoHtml}</td>
-          <td><button class="pay-confirm-btn" onclick="showClientHist('${(c.wpp||'').replace(/'/g,"\\'")}','${(c.nome||'').replace(/'/g,"\\'")}')">Ver histórico</button></td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="pay-confirm-btn" onclick="openClientDetail('${idSafe}')">📋 Ver</button>
+              <button class="pay-confirm-btn" style="background:#E1F5EE;color:#0F6E56;" onclick="openClientDetail('${idSafe}',true)">✏️ Editar</button>
+            </div>
+          </td>
         </tr>`;
       }).join("");
 }
@@ -5816,6 +5898,216 @@ function closeClientHist() {
   document.getElementById("client-hist-modal").classList.remove("open");
 }
 
+// ═══════════════════════════════════════════════════════
+//  BIRTHDAY ALERTS — alertas progressivos de aniversário
+// ═══════════════════════════════════════════════════════
+let _dismissedBdays = JSON.parse(sessionStorage.getItem("dismissedBdays") || "[]");
+
+function renderBdayAlerts(clients) {
+  const wrap = document.getElementById("bday-alerts-wrap");
+  if (!wrap) return;
+  const today = new Date();
+  const alerts = [];
+  (clients || allClients).forEach(c => {
+    if (!c.bday) return;
+    const bd = new Date(c.bday + "T12:00");
+    const bdThis = new Date(today.getFullYear(), bd.getMonth(), bd.getDate());
+    const diff = Math.ceil((bdThis - today) / (1000*60*60*24));
+    const diffAdj = diff < 0 ? diff + 365 : diff;
+    if (diffAdj <= 5) alerts.push({ c, diff: diffAdj });
+  });
+  alerts.sort((a,b) => a.diff - b.diff);
+
+  const visible = alerts.filter(a => !_dismissedBdays.includes(a.c.id + "_" + today.toDateString()));
+  if (!visible.length) { wrap.innerHTML = ""; return; }
+
+  wrap.innerHTML = visible.map(({ c, diff }) => {
+    const isToday = diff === 0;
+    const key = c.id + "_" + today.toDateString();
+    let msg, emoji;
+    if (isToday) { emoji = "🎉"; msg = `Hoje é aniversário de <strong>${c.nome}</strong>! Que tal enviar uma mensagem especial?`; }
+    else if (diff === 1) { emoji = "🎂"; msg = `Amanhã é aniversário de <strong>${c.nome}</strong>. Prepare uma surpresa!`; }
+    else { emoji = "🍰"; msg = `Aniversário de <strong>${c.nome}</strong> em <strong>${diff} dias</strong> (${new Date(c.bday+"T12:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"long"})}).`; }
+    return `<div class="bday-alert-bar${isToday?' bday-alert-today':''}" id="bday-alert-${c.id}">
+      <span style="font-size:22px;">${emoji}</span>
+      <span class="bday-alert-msg">${msg}</span>
+      ${c.wpp ? `<button onclick="notifyBday('${c.wpp}','${(c.nome||'').replace(/'/g,"\\'")}',this)" style="background:rgba(255,255,255,.15);border:none;color:#fff;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">🎁 Parabenizar</button>` : ""}
+      <button class="bday-alert-close" onclick="dismissBdayAlert('${c.id}')">✕</button>
+    </div>`;
+  }).join("");
+}
+
+function dismissBdayAlert(clientId) {
+  const today = new Date().toDateString();
+  const key = clientId + "_" + today;
+  if (!_dismissedBdays.includes(key)) _dismissedBdays.push(key);
+  sessionStorage.setItem("dismissedBdays", JSON.stringify(_dismissedBdays));
+  const el = document.getElementById("bday-alert-" + clientId);
+  if (el) el.remove();
+}
+
+// ═══════════════════════════════════════════════════════
+//  CLIENT DETAIL + EDIT MODAL
+// ═══════════════════════════════════════════════════════
+let _cdClientId = null;
+let _cdEditMode = false;
+
+async function openClientDetail(clientId, editMode = false) {
+  _cdClientId = clientId;
+  _cdEditMode = editMode;
+  const modal = document.getElementById("client-detail-modal");
+  modal.classList.add("open");
+
+  // Load client from cache or Firebase
+  let c = allClients.find(x => x.id === clientId);
+  if (!c) {
+    try { const docs = await fbGet("clients"); allClients = docs; c = docs.find(x => x.id === clientId); } catch {}
+  }
+  if (!c) { showToast("Cliente não encontrado", "error"); modal.classList.remove("open"); return; }
+
+  // Load orders for this client
+  const wppNorm = (c.wpp||"").replace(/\D/g,"");
+  let orders = allOrders.filter(o => (o.cliente?.wpp||"").replace(/\D/g,"") === wppNorm);
+  if (!orders.length && wppNorm) {
+    try {
+      const snap = await FB.getDocs(FB.query(FB.collection(db,"orders"), FB.where("cliente.wpp","==",wppNorm)));
+      snap.forEach(d => orders.push({ id:d.id, ...d.data() }));
+    } catch {}
+  }
+  orders.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+
+  // Header
+  document.getElementById("cd-avatar").textContent = (c.nome||"?").substring(0,2).toUpperCase();
+  document.getElementById("cd-title").textContent = c.nome || "—";
+  document.getElementById("cd-subtitle").textContent = `WhatsApp: ${c.wpp||"—"} · ${orders.length} pedido(s)`;
+  document.getElementById("cd-edit-btn").textContent = editMode ? "💾 Salvar" : "✏️ Editar";
+  document.getElementById("cd-edit-btn").onclick = editMode ? () => cdSave(c) : () => { _cdEditMode = true; openClientDetail(clientId, true); };
+
+  // Load fiado
+  let fiadoSaldo = null;
+  if (!allFiadoAccounts.length) { try { allFiadoAccounts = await fbGet("fiadoAccounts"); } catch {} }
+  const fiadoAcc = allFiadoAccounts.find(a => (a.clientWpp||"").replace(/\D/g,"") === wppNorm);
+  if (fiadoAcc) fiadoSaldo = Number(fiadoAcc.saldo||0);
+
+  // Favorite product
+  const prodCount = {};
+  orders.forEach(o => (o.itens||[]).forEach(i => { prodCount[i.nome] = (prodCount[i.nome]||0) + i.qty; }));
+  const favorito = Object.entries(prodCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || c.favorito || "—";
+  const totalGasto = orders.filter(o=>!["cancelado"].includes(o.status)).reduce((s,o)=>s+Number(o.total||0),0);
+
+  const ro = editMode ? "" : "readonly";
+  const rd = editMode ? "" : "disabled";
+
+  document.getElementById("cd-body").innerHTML = `
+    <!-- KPI row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px;">
+      <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;">Pedidos</div>
+        <div style="font-size:22px;font-weight:700;color:var(--teal-dark);">${orders.length}</div>
+      </div>
+      <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;">Total gasto</div>
+        <div style="font-size:20px;font-weight:700;color:var(--teal-dark);">R$ ${totalGasto.toFixed(2).replace(".",",")}</div>
+      </div>
+      <div style="background:var(--cream);border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;">Favorito</div>
+        <div style="font-size:12px;font-weight:600;color:var(--teal-dark);margin-top:4px;">${favorito}</div>
+      </div>
+      ${fiadoSaldo !== null ? `<div style="background:#E1F5EE;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:10px;color:#0F6E56;font-weight:600;text-transform:uppercase;">Fiado</div>
+        <div style="font-size:20px;font-weight:700;color:#0F6E56;">R$ ${fiadoSaldo.toFixed(2).replace(".",",")}</div>
+      </div>` : ""}
+    </div>
+
+    <!-- Edit fields -->
+    <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Dados do Cliente ${editMode ? '<span style="background:#E1F5EE;color:#0F6E56;padding:2px 8px;border-radius:6px;font-size:10px;">Modo edição</span>' : ''}</div>
+    <div class="client-field-grid">
+      <div class="client-field">
+        <label>Nome completo</label>
+        <input id="cd-nome" type="text" value="${c.nome||""}" ${ro}>
+      </div>
+      <div class="client-field">
+        <label>WhatsApp</label>
+        <input id="cd-wpp" type="text" value="${c.wpp||""}" ${ro}>
+      </div>
+      <div class="client-field">
+        <label>Aniversário</label>
+        <input id="cd-bday" type="date" value="${c.bday||""}" ${rd}>
+      </div>
+      <div class="client-field">
+        <label>E-mail (opcional)</label>
+        <input id="cd-email" type="email" value="${c.email||""}" ${ro}>
+      </div>
+      <div class="client-field">
+        <label>Endereço / Bairro</label>
+        <input id="cd-endereco" type="text" value="${c.endereco||""}" ${ro}>
+      </div>
+      <div class="client-field">
+        <label>Produto favorito</label>
+        <input id="cd-favorito" type="text" value="${c.favorito||""}" placeholder="${favorito}" ${ro}>
+      </div>
+    </div>
+    <div class="client-field" style="margin-bottom:20px;">
+      <label>Observações / Alergias / Preferências</label>
+      <textarea id="cd-obs" rows="3" ${ro}>${c.obs||""}</textarea>
+    </div>
+
+    ${editMode ? `<div style="display:flex;gap:10px;margin-bottom:20px;">
+      <button onclick="cdSave()" style="flex:1;background:var(--teal);color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">💾 Salvar alterações</button>
+      <button onclick="openClientDetail('${clientId}',false)" style="padding:12px 18px;border:1.5px solid var(--border);background:#fff;border-radius:10px;font-size:13px;cursor:pointer;color:var(--muted);">Cancelar</button>
+    </div>` : `<div style="display:flex;gap:10px;margin-bottom:20px;">
+      <button onclick="openClientDetail('${clientId}',true)" style="background:var(--teal);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">✏️ Editar dados</button>
+      ${c.wpp ? `<a href="https://wa.me/55${(c.wpp).replace(/\D/g,'')}" target="_blank" style="background:#25D366;color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px;"><i class="ti ti-brand-whatsapp"></i> WhatsApp</a>` : ""}
+    </div>`}
+
+    <!-- Order history -->
+    <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;border-top:1px solid var(--border);padding-top:16px;">Histórico de Pedidos</div>
+    ${orders.length === 0
+      ? `<div style="color:var(--muted);font-size:13px;padding:12px 0;">Nenhum pedido encontrado</div>`
+      : orders.slice(0,8).map(o => {
+          const dateStr = o.dataRetirada ? new Date(o.dataRetirada+"T12:00").toLocaleDateString("pt-BR") : "—";
+          return `<div class="client-hist-order">
+            <div class="client-hist-order-top">
+              <div style="font-size:12px;color:var(--muted);">${dateStr} · ${payLabel(o.pagamento)}</div>
+              <span class="status-badge ${statusClass(o.status)}">${statusLabel(o.status)}</span>
+            </div>
+            <div style="font-size:12px;color:var(--text);margin-bottom:4px;">${(o.itens||[]).map(i=>`${i.qty}× ${i.nome}`).join(", ")}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--teal-dark);">R$ ${Number(o.total||0).toFixed(2).replace(".",",")}${o.pagamentoConfirmado?' <span style="color:#0F6E56;font-size:11px;">✓ Pago</span>':''}</div>
+          </div>`;
+        }).join("")}
+    ${orders.length > 8 ? `<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px;">+ ${orders.length-8} pedido(s) mais antigos</div>` : ""}
+  `;
+}
+
+async function cdSave() {
+  const c = allClients.find(x => x.id === _cdClientId);
+  if (!c) return;
+  const updates = {
+    nome:      document.getElementById("cd-nome")?.value.trim() || c.nome,
+    wpp:       document.getElementById("cd-wpp")?.value.trim() || c.wpp,
+    bday:      document.getElementById("cd-bday")?.value || c.bday || "",
+    email:     document.getElementById("cd-email")?.value.trim() || "",
+    endereco:  document.getElementById("cd-endereco")?.value.trim() || "",
+    favorito:  document.getElementById("cd-favorito")?.value.trim() || c.favorito || "",
+    obs:       document.getElementById("cd-obs")?.value.trim() || "",
+  };
+  try {
+    await fbUpdate("clients", _cdClientId, updates);
+    allClients = allClients.map(x => x.id === _cdClientId ? { ...x, ...updates } : x);
+    showToast("Dados do cliente salvos!", "success");
+    openClientDetail(_cdClientId, false); // switch back to view mode
+    renderClients();
+  } catch(e) {
+    console.error(e);
+    showToast("Erro ao salvar. Tente novamente.", "error");
+  }
+}
+
+function closeClientDetail() {
+  document.getElementById("client-detail-modal").classList.remove("open");
+  _cdClientId = null;
+}
+
 // ─── PIX COPY ──────────────────────────────────────────
 function copyPix() {
   const key = PIX_KEY || "panilloconfart@gmail.com";
@@ -6039,9 +6331,15 @@ function updateMbnBadge(count) {
 function toggleAdminSidebar() {
   const sidebar = document.querySelector(".admin-sidebar");
   const overlay = document.getElementById("admin-mob-overlay");
-  const isOpen  = sidebar.classList.contains("open");
-  sidebar.classList.toggle("open");
-  overlay.classList.toggle("open", !isOpen);
+  if (window.innerWidth > 900) {
+    // Desktop: colapsa/expande sidebar
+    sidebar.classList.toggle("collapsed");
+  } else {
+    // Mobile: slide in/out com overlay
+    const isOpen = sidebar.classList.contains("open");
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("open", !isOpen);
+  }
 }
 
 // Fecha sidebar ao clicar em um item (mobile)
@@ -6103,7 +6401,8 @@ async function loadIndicadores(mode) {
   const totalRec = filtered.reduce((s,o) => s + Number(o.total||0), 0);
   const recebido = filtered.filter(o => o.pagamentoConfirmado).reduce((s,o) => s + Number(o.total||0), 0);
   const aReceber = totalRec - recebido;
-  const overhead = (cfg && cfg.overhead ? Number(cfg.overhead) : 20) / 100;
+  const _cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  const overhead = (Number(_cfg.overhead) || 20) / 100;
   const lucro = totalRec * (1 - overhead);
   const ticket = filtered.length ? totalRec / filtered.length : 0;
   const cancelados = orders.filter(o => {
@@ -6771,6 +7070,26 @@ async function submitVendaPresencial() {
     </div>
     <div class="client-hist-body" id="client-hist-body">
       <div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center;">Carregando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: CLIENTE DETALHES + EDITAR ── -->
+<div class="client-detail-overlay" id="client-detail-modal">
+  <div class="client-detail-box">
+    <div class="client-detail-header">
+      <div class="client-detail-av" id="cd-avatar">?</div>
+      <div style="flex:1;">
+        <div style="font-size:17px;font-weight:700;color:var(--teal-dark);" id="cd-title">Cliente</div>
+        <div style="font-size:12px;color:var(--muted);" id="cd-subtitle"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button id="cd-edit-btn" onclick="cdToggleEdit()" style="background:var(--teal);color:#fff;border:none;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Editar</button>
+        <button onclick="closeClientDetail()" style="background:none;border:1.5px solid var(--border);padding:7px 12px;border-radius:8px;font-size:14px;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+    </div>
+    <div class="client-detail-body" id="cd-body">
+      <!-- filled by JS -->
     </div>
   </div>
 </div>
