@@ -26,15 +26,24 @@
     if (!res.ok) throw new Error("config error");
     cfg = await res.json();
   } catch (e) {
-    document.body.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0F4A4A;font-family:system-ui;">
-        <div style="background:#fff;border-radius:16px;padding:40px;text-align:center;max-width:400px;">
-          <div style="font-size:40px;margin-bottom:16px;">⚠️</div>
-          <div style="font-size:18px;font-weight:500;color:#0F4A4A;margin-bottom:8px;">Configuração pendente</div>
-          <div style="font-size:13px;color:#777;">Adicione as variáveis de ambiente no Vercel e faça um novo deploy.</div>
-        </div>
+    // Não substituir document.body (quebraria o JS restante da página).
+    // Em vez disso, mostra um overlay sobre o conteúdo existente.
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#0F4A4A;font-family:system-ui;";
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:16px;padding:40px;text-align:center;max-width:400px;">
+        <div style="font-size:40px;margin-bottom:16px;">⚠️</div>
+        <div style="font-size:18px;font-weight:500;color:#0F4A4A;margin-bottom:8px;">Configuração pendente</div>
+        <div style="font-size:13px;color:#777;">Adicione as variáveis de ambiente no Vercel e faça um novo deploy.</div>
       </div>`;
-    throw e;
+    // Aguarda o DOM estar pronto antes de inserir
+    if (document.body) {
+      document.body.appendChild(overlay);
+    } else {
+      document.addEventListener("DOMContentLoaded", () => document.body.appendChild(overlay));
+    }
+    console.error("Panillo: /api/config falhou —", e.message);
+    return; // encerra o módulo sem throw, preservando o JS do resto da página
   }
   // ────────────────────────────────────────────────────────────────────────────
 
@@ -5603,15 +5612,44 @@ async function generateDesc() {
 // ─── CLAUDE API (via proxy seguro /api/claude) ─────────
 // A chave fica no Vercel como variável de ambiente — nunca exposta no browser.
 async function callClaudeAPI(prompt, maxTokens = 200) {
-  const resp = await fetch("/api/claude", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, maxTokens })
-  });
-  if (!resp.ok) throw new Error("API error");
+  // Tenta o formato messages (padrão Anthropic nativo)
+  const body = {
+    model: "claude-haiku-4-5",
+    max_tokens: maxTokens,
+    messages: [{ role: "user", content: prompt }]
+  };
+  let resp;
+  try {
+    resp = await fetch("/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+  } catch (e) {
+    throw new Error("Sem conexão com a API");
+  }
+
+  // Se 400/404 com formato messages, tenta o formato legado { prompt, maxTokens }
+  if (!resp.ok && (resp.status === 400 || resp.status === 422)) {
+    resp = await fetch("/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, maxTokens })
+    });
+  }
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`API ${resp.status}: ${errText.slice(0, 100)}`);
+  }
+
   const data = await resp.json();
   if (data.error) throw new Error(data.error);
-  return data.text || "";
+  // Suporta resposta no formato Anthropic { content: [{text}] } ou legado { text }
+  if (data.content && Array.isArray(data.content)) {
+    return data.content.map(c => c.text || "").join("").trim();
+  }
+  return (data.text || data.completion || "").trim();
 }
 
 // ─── PERIOD TOGGLE ─────────────────────────────────────
