@@ -12,7 +12,7 @@
 <!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { initializeFirestore, collection, addDoc, getDocs, doc, updateDoc, query, where, orderBy, serverTimestamp }
+  import { initializeFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -59,7 +59,7 @@
   window._wppNumber = cfg.wppNumber;
   window._pixKey    = cfg.pixKey;
   window._fbModules = {
-    collection, addDoc, getDocs, doc, updateDoc,
+    collection, addDoc, getDocs, doc, updateDoc, deleteDoc,
     query, where, orderBy, serverTimestamp,
     signInWithEmailAndPassword, signOut, onAuthStateChanged
   };
