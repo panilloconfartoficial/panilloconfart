@@ -2867,6 +2867,7 @@ img { max-width: 100%; display: block; }
         <div class="tab-row">
           <button class="tab-btn active" onclick="showSupTab('ing',this)">Ingredientes</button>
           <button class="tab-btn" onclick="showSupTab('receitas',this)">Custo por receita</button>
+          <button class="tab-btn" onclick="showSupTab('baixa',this)">🧁 Baixa por Produção</button>
         </div>
         <div id="tab-ing">
           <div class="admin-card" style="padding:0;overflow:hidden;">
@@ -2890,6 +2891,77 @@ img { max-width: 100%; display: block; }
         <div id="tab-receitas" class="hidden">
           <div class="recipe-grid" id="recipe-grid"></div>
         </div>
+
+        <!-- ── ABA: BAIXA POR PRODUÇÃO ── -->
+        <div id="tab-baixa" class="hidden">
+          <div class="admin-card" style="padding:20px;margin-bottom:16px;background:linear-gradient(90deg,#1B4332,#2D6A4F);color:#fff;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px;">🧁 Como funciona</div>
+            <div style="font-size:12px;opacity:.85;line-height:1.6;">Informe o que você produziu hoje para dar baixa automática nos suprimentos. Selecione a receita (produto), a quantidade de lotes produzidos e confirme — o sistema desconta os ingredientes do estoque.</div>
+          </div>
+
+          <!-- Formulário de baixa por IA -->
+          <div class="admin-card" style="padding:20px;margin-bottom:16px;">
+            <div class="ac-title" style="margin-bottom:16px;">🤖 Registrar produção por texto (IA)</div>
+            <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Descreva o que produziu em linguagem natural. A IA vai interpretar e preencher o formulário abaixo automaticamente.</div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input class="fi" id="baixa-ia-input" type="text"
+                placeholder='Ex: "fiz 3 lotes de Cookie Oreo e 2 de Brownie Ninho"'
+                style="flex:1;" onkeydown="if(event.key==='Enter')interpretarProducaoIA()">
+              <button class="btn-sm-primary" onclick="interpretarProducaoIA()" id="baixa-ia-btn" style="white-space:nowrap;">
+                <i class="ti ti-sparkles"></i> Interpretar
+              </button>
+            </div>
+            <div id="baixa-ia-feedback" style="font-size:12px;color:var(--muted);min-height:18px;"></div>
+          </div>
+
+          <!-- Formulário manual de baixa -->
+          <div class="admin-card" style="padding:20px;margin-bottom:16px;">
+            <div class="ac-title" style="margin-bottom:16px;">📋 Adicionar itens produzidos</div>
+            <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
+              <div class="fg" style="margin:0;flex:2;min-width:180px;">
+                <label class="fl">Produto / Receita</label>
+                <select class="fi" id="baixa-prod-sel">
+                  <option value="">Selecione o produto...</option>
+                </select>
+              </div>
+              <div class="fg" style="margin:0;flex:1;min-width:100px;">
+                <label class="fl">Lotes produzidos</label>
+                <input class="fi" id="baixa-lotes" type="number" min="1" value="1" placeholder="1">
+              </div>
+              <button class="btn-sm-primary" onclick="adicionarItemBaixa()" style="flex-shrink:0;align-self:flex-end;">+ Adicionar</button>
+            </div>
+
+            <!-- Lista de itens adicionados -->
+            <div id="baixa-itens-lista" style="margin-bottom:16px;">
+              <div style="color:var(--muted);font-size:13px;padding:12px 0;text-align:center;" id="baixa-lista-vazia">
+                Nenhum item adicionado ainda. Selecione um produto acima.
+              </div>
+            </div>
+
+            <!-- Prévia do desconto -->
+            <div id="baixa-preview" class="hidden" style="background:var(--cream);border-radius:10px;padding:14px;margin-bottom:16px;">
+              <div style="font-size:13px;font-weight:600;color:var(--teal-dark);margin-bottom:10px;">📦 Ingredientes que serão descontados do estoque:</div>
+              <div id="baixa-preview-list"></div>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+              <button class="btn-back" onclick="limparBaixa()">Limpar</button>
+              <button class="btn-sm-primary" id="baixa-confirmar-btn" onclick="confirmarBaixa()" style="padding:10px 28px;" disabled>
+                ✅ Confirmar baixa no estoque
+              </button>
+            </div>
+          </div>
+
+          <!-- Histórico de produções registradas -->
+          <div class="admin-card" style="padding:20px;">
+            <div class="ac-title" style="margin-bottom:14px;">📁 Histórico de produções</div>
+            <div id="baixa-historico">
+              <div style="color:var(--muted);font-size:13px;">Nenhuma produção registrada ainda.</div>
+            </div>
+          </div>
+        </div>
+        <!-- /tab-baixa -->
+
       </div>
     </div>
 
@@ -2901,7 +2973,7 @@ img { max-width: 100%; display: block; }
           <div class="admin-page-title">IA de Marketing</div>
         </div>
         <div class="topbar-right">
-          <span style="font-size:12px;color:var(--muted);">Powered by Claude AI</span>
+          <span style="font-size:12px;color:var(--muted);">Powered by Gemini AI</span>
         </div>
       </div>
       <div class="admin-content">
@@ -2980,7 +3052,7 @@ img { max-width: 100%; display: block; }
           <div class="ai-header">
             <div class="ai-dot"></div>
             <span class="ai-title">Assistente da Panillo</span>
-            <span class="ai-badge">CLAUDE AI</span>
+            <span class="ai-badge">GEMINI AI</span>
           </div>
           <div id="ia-chat-history" style="max-height:320px;overflow-y:auto;margin-bottom:12px;"></div>
           <div class="ai-input-row">
@@ -5292,11 +5364,492 @@ async function saveIngredient() {
 }
 
 function showSupTab(tab, btn) {
-  document.querySelectorAll("#tab-ing, #tab-receitas").forEach(t => t.classList.add("hidden"));
+  document.querySelectorAll("#tab-ing, #tab-receitas, #tab-baixa").forEach(t => t.classList.add("hidden"));
   document.getElementById("tab-" + tab).classList.remove("hidden");
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   if (tab === "receitas") renderRecipes();
+  if (tab === "baixa") initBaixa();
+}
+
+// ─── BAIXA POR PRODUÇÃO ────────────────────────────────
+let baixaItens = []; // [{ prodId, prodNome, ingredientes:[{ingId,ingNome,gramsPorLote}], lotes, emoji }]
+
+function initBaixa() {
+  // Popula o select de produtos com ingredientes cadastrados
+  const sel = document.getElementById("baixa-prod-sel");
+  if (!sel) return;
+  const comReceita = allProducts.filter(p => p.ingredientes && p.ingredientes.length > 0);
+  sel.innerHTML = `<option value="">Selecione o produto...</option>` +
+    comReceita.map(p => `<option value="${p.id}">${p.emoji||"🍪"} ${p.nome}</option>`).join("");
+  renderBaixaItens();
+  renderBaixaHistorico();
+}
+
+function adicionarItemBaixa() {
+  const prodId = document.getElementById("baixa-prod-sel").value;
+  const lotes  = parseInt(document.getElementById("baixa-lotes").value) || 1;
+  if (!prodId) { showToast("Selecione um produto!"); return; }
+  const prod = allProducts.find(p => p.id === prodId);
+  if (!prod) return;
+
+  const existente = baixaItens.findIndex(b => b.prodId === prodId);
+  if (existente >= 0) {
+    baixaItens[existente].lotes += lotes;
+  } else {
+    baixaItens.push({
+      prodId,
+      prodNome: prod.nome,
+      emoji: prod.emoji || "🍪",
+      ingredientes: (prod.ingredientes || []).map(pi => {
+        const ing = allIngredients.find(i => i.id === pi.ingId);
+        return {
+          ingId: pi.ingId,
+          ingNome: ing ? ing.nome : pi.ingId,
+          gramsPorLote: pi.grams || 0
+        };
+      }),
+      lotes
+    });
+  }
+  document.getElementById("baixa-prod-sel").value = "";
+  document.getElementById("baixa-lotes").value = "1";
+  renderBaixaItens();
+}
+
+function renderBaixaItens() {
+  const lista = document.getElementById("baixa-itens-lista");
+  const vazia = document.getElementById("baixa-lista-vazia");
+  const preview = document.getElementById("baixa-preview");
+  const confirmar = document.getElementById("baixa-confirmar-btn");
+  if (!lista) return;
+
+  if (baixaItens.length === 0) {
+    lista.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:12px 0;text-align:center;" id="baixa-lista-vazia">Nenhum item adicionado ainda.</div>`;
+    if (preview) preview.classList.add("hidden");
+    if (confirmar) confirmar.disabled = true;
+    return;
+  }
+
+  lista.innerHTML = baixaItens.map((item, idx) => `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--border);">
+      <span style="font-size:22px;">${item.emoji}</span>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:500;color:var(--text);">${item.prodNome}</div>
+        <div style="font-size:11px;color:var(--muted);">${item.ingredientes.length} ingrediente${item.ingredientes.length!==1?"s":""} na receita</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button onclick="baixaChangeQty(${idx},-1)" style="background:var(--cream-dark);border:1px solid var(--border-mid);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">−</button>
+        <span style="font-size:14px;font-weight:600;min-width:24px;text-align:center;">${item.lotes}</span>
+        <button onclick="baixaChangeQty(${idx},1)" style="background:var(--cream-dark);border:1px solid var(--border-mid);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">+</button>
+        <span style="font-size:12px;color:var(--muted);">lote${item.lotes!==1?"s":""}</span>
+      </div>
+      <button onclick="baixaRemove(${idx})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:4px;line-height:1;">✕</button>
+    </div>
+  `).join("");
+
+  // Monta prévia dos descontos consolidados
+  const descontos = {}; // ingId → { nome, totalGrams }
+  baixaItens.forEach(item => {
+    item.ingredientes.forEach(pi => {
+      const total = pi.gramsPorLote * item.lotes;
+      if (!descontos[pi.ingId]) descontos[pi.ingId] = { nome: pi.ingNome, totalGrams: 0 };
+      descontos[pi.ingId].totalGrams += total;
+    });
+  });
+
+  const previewList = document.getElementById("baixa-preview-list");
+  const rows = Object.entries(descontos).map(([ingId, d]) => {
+    const ing = allIngredients.find(i => i.id === ingId);
+    const estoqueAtual = ing ? Number(ing.estoque || 0) : 0;
+    const unidade = ing ? ing.unit : "g";
+    const grams = d.totalGrams;
+    const estoqueApos = Math.max(0, estoqueAtual - grams);
+    const insuficiente = estoqueAtual < grams;
+    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:12px;">
+      <span style="color:var(--text-mid);">${d.nome}</span>
+      <span style="display:flex;gap:12px;align-items:center;">
+        <span style="color:var(--muted);">−${grams}${unidade === "kg" ? "g" : unidade}</span>
+        <span style="color:${insuficiente ? "#993C1D" : "var(--teal-dark)"};font-weight:500;">
+          ${insuficiente ? "⚠️ Insuficiente" : `Restará: ${estoqueApos}${unidade === "kg" ? "g" : unidade}`}
+        </span>
+      </span>
+    </div>`;
+  }).join("");
+
+  if (previewList) previewList.innerHTML = rows || '<div style="color:var(--muted);font-size:12px;">Nenhum ingrediente mapeado.</div>';
+  if (preview) preview.classList.remove("hidden");
+  if (confirmar) confirmar.disabled = false;
+}
+
+function baixaChangeQty(idx, delta) {
+  baixaItens[idx].lotes = Math.max(1, baixaItens[idx].lotes + delta);
+  renderBaixaItens();
+}
+
+function baixaRemove(idx) {
+  baixaItens.splice(idx, 1);
+  renderBaixaItens();
+}
+
+function limparBaixa() {
+  baixaItens = [];
+  renderBaixaItens();
+}
+
+async function confirmarBaixa() {
+  if (baixaItens.length === 0) return;
+  const btn = document.getElementById("baixa-confirmar-btn");
+  btn.disabled = true;
+  btn.textContent = "Registrando...";
+
+  // Consolida descontos
+  const descontos = {};
+  baixaItens.forEach(item => {
+    item.ingredientes.forEach(pi => {
+      const total = pi.gramsPorLote * item.lotes;
+      if (!descontos[pi.ingId]) descontos[pi.ingId] = 0;
+      descontos[pi.ingId] += total;
+    });
+  });
+
+  let erros = 0;
+  for (const [ingId, grams] of Object.entries(descontos)) {
+    const ing = allIngredients.find(i => i.id === ingId);
+    if (!ing) continue;
+    const novoEstoque = Math.max(0, Number(ing.estoque || 0) - grams);
+    try {
+      await fbUpdate("ingredients", ingId, { estoque: novoEstoque });
+      allIngredients = allIngredients.map(i => i.id === ingId ? { ...i, estoque: novoEstoque } : i);
+    } catch(e) {
+      console.warn("Erro ao dar baixa em", ing.nome, e);
+      erros++;
+    }
+  }
+
+  // Salva no histórico local
+  const agora = new Date();
+  const entrada = {
+    data: agora.toLocaleDateString("pt-BR"),
+    hora: agora.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }),
+    itens: baixaItens.map(b => `${b.lotes}× ${b.prodNome}`).join(", "),
+    descontos: Object.fromEntries(
+      Object.entries(descontos).map(([id, g]) => {
+        const ing = allIngredients.find(i => i.id === id);
+        return [ing ? ing.nome : id, g];
+      })
+    )
+  };
+  try {
+    await fbAdd("producaoLog", {
+      ...entrada,
+      itensBrutos: baixaItens,
+      createdAt: new Date().toISOString()
+    });
+  } catch(e) {}
+
+  if (erros === 0) {
+    showToast("✅ Baixa registrada no estoque!", "success");
+  } else {
+    showToast(`⚠️ Baixa parcial — ${erros} ingrediente(s) com erro.`);
+  }
+
+  // Guarda os itens para o modal de transferência ANTES de limpar
+  const itensBaixados = [...baixaItens];
+
+  baixaItens = [];
+  renderIngredients();
+  renderBaixaItens();
+  renderBaixaHistorico();
+  btn.disabled = false;
+  btn.textContent = "✅ Confirmar baixa no estoque";
+
+  // Abre modal perguntando se quer transferir para PE
+  abrirModalTransferenciaPE(itensBaixados);
+}
+
+// ─── MODAL: TRANSFERÊNCIA PARA PRONTA ENTREGA ─────────
+function abrirModalTransferenciaPE(itensBaixados) {
+  // Só mostra produtos que realmente existem no sistema
+  const produtosValidos = itensBaixados.filter(b => allProducts.find(p => p.id === b.prodId));
+  if (produtosValidos.length === 0) return;
+
+  // Cria o modal dinamicamente se não existir
+  let modal = document.getElementById("modal-transf-pe");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "modal-transf-pe";
+    modal.style.cssText = `
+      position:fixed;inset:0;z-index:9999;
+      background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);
+      display:flex;align-items:center;justify-content:center;padding:16px;
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Calcula sugestão: lotes × rendimento do produto
+  const linhas = produtosValidos.map(item => {
+    const prod = allProducts.find(p => p.id === item.prodId);
+    const rendimento = prod?.rendimento || 1;
+    const sugestao = item.lotes * rendimento;
+    const estoqueAtual = allStock[item.prodId]?.qty || 0;
+    return { item, prod, rendimento, sugestao, estoqueAtual };
+  });
+
+  modal.innerHTML = `
+    <div style="
+      background:#fff;border-radius:20px;width:100%;max-width:480px;
+      overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.22);
+      animation:fadeIn .25s ease;
+    ">
+      <!-- Header -->
+      <div style="background:var(--teal-dark);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-family:var(--font-display);font-size:20px;font-weight:600;color:#fff;">
+            Transferir para Pronta Entrega
+          </div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:3px;">
+            Quantos já estão assados e prontos para venda?
+          </div>
+        </div>
+        <button onclick="fecharModalTransfPE()" style="
+          background:rgba(255,255,255,0.1);border:none;color:#fff;
+          width:32px;height:32px;border-radius:50%;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;font-size:18px;
+        ">×</button>
+      </div>
+
+      <!-- Aviso congelados -->
+      <div style="background:#EDF7FF;border-bottom:1px solid #BDE0F7;padding:11px 24px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">🧊</span>
+        <span style="font-size:12px;color:#2A6090;line-height:1.5;">
+          Os produtos <strong>congelados</strong> ficam no freezer. Informe apenas os que já foram <strong>assados e estão prontos</strong> para pronta entrega agora.
+        </span>
+      </div>
+
+      <!-- Lista de produtos -->
+      <div style="padding:20px 24px;max-height:360px;overflow-y:auto;" id="transf-pe-lista">
+        ${linhas.map(({ item, prod, rendimento, sugestao, estoqueAtual }, idx) => `
+          <div style="
+            padding:14px;border-radius:12px;border:1.5px solid var(--border);
+            margin-bottom:12px;background:var(--cream);
+          " id="transf-row-${idx}">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              <span style="font-size:24px;">${item.emoji}</span>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:600;color:var(--teal-dark);">${item.prodNome}</div>
+                <div style="font-size:11px;color:var(--muted);">
+                  ${item.lotes} lote${item.lotes!==1?"s":""} produzido${item.lotes!==1?"s":""} ×
+                  ${rendimento} unid./lote =
+                  <strong>${sugestao} unid. total</strong>
+                  · Estoque PE atual: ${estoqueAtual} unid.
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <label style="font-size:12px;color:var(--muted);white-space:nowrap;">Prontos para PE agora:</label>
+              <input
+                type="number" min="0" max="${sugestao}" value="${sugestao}"
+                id="transf-qty-${idx}"
+                oninput="atualizarResumoTransf()"
+                style="
+                  width:80px;padding:8px 10px;border:1.5px solid var(--border-mid);
+                  border-radius:8px;font-size:15px;font-weight:600;
+                  color:var(--teal-dark);text-align:center;outline:none;
+                "
+                onchange="this.value=Math.min(Math.max(0,parseInt(this.value)||0),${sugestao});atualizarResumoTransf();"
+              >
+              <span style="font-size:12px;color:var(--muted);">unidades</span>
+              <span style="font-size:11px;color:#2A7055;margin-left:auto;" id="transf-congelados-${idx}">
+                🧊 ${sugestao} congelados
+              </span>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+
+      <!-- Rodapé -->
+      <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="fecharModalTransfPE()" style="
+          background:var(--cream);border:1px solid var(--border-mid);
+          color:var(--muted);padding:10px 22px;border-radius:10px;font-size:13px;cursor:pointer;
+        ">Deixar para depois</button>
+        <button onclick="confirmarTransferenciaPE(${JSON.stringify(linhas.map(l=>({prodId:l.item.prodId, sugestao:l.sugestao})))})" style="
+          background:var(--teal-dark);color:#fff;border:none;
+          padding:10px 26px;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;
+        " id="transf-confirmar-btn">
+          ✅ Transferir para PE
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = "flex";
+  // Inicializa o cálculo de congelados
+  atualizarResumoTransf();
+}
+
+function atualizarResumoTransf() {
+  const lista = document.getElementById("transf-pe-lista");
+  if (!lista) return;
+  // Para cada linha, recalcula quantos ficam congelados
+  lista.querySelectorAll("[id^='transf-qty-']").forEach(input => {
+    const idx = input.id.replace("transf-qty-","");
+    const max = parseInt(input.max) || 0;
+    const val = parseInt(input.value) || 0;
+    const congelados = Math.max(0, max - val);
+    const tag = document.getElementById("transf-congelados-" + idx);
+    if (tag) {
+      tag.textContent = congelados > 0
+        ? `🧊 ${congelados} vão congelados`
+        : "🔥 Todos assados";
+      tag.style.color = congelados > 0 ? "#2A6090" : "#1A7A44";
+    }
+  });
+}
+
+function fecharModalTransfPE() {
+  const modal = document.getElementById("modal-transf-pe");
+  if (modal) modal.style.display = "none";
+}
+
+async function confirmarTransferenciaPE(linhas) {
+  const btn = document.getElementById("transf-confirmar-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Transferindo..."; }
+
+  let transferidos = 0;
+  let erros = 0;
+
+  for (let idx = 0; idx < linhas.length; idx++) {
+    const { prodId } = linhas[idx];
+    const inputQty = document.getElementById("transf-qty-" + idx);
+    const qty = parseInt(inputQty?.value) || 0;
+    if (qty <= 0) continue;
+
+    const s = allStock[prodId] || {};
+    const novaQty = (s.qty || 0) + qty;
+
+    try {
+      const docs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId)));
+      if (docs.empty) {
+        // Cria registro de estoque PE ativando o produto
+        const ref = await fbAdd("stock", { prodId, qty: novaQty, ativo: true });
+        allStock[prodId] = { id: ref.id, qty: novaQty, ativo: true };
+      } else {
+        const docRef = docs.docs[0].ref;
+        const jaAtivo = docs.docs[0].data().ativo || false;
+        await FB.updateDoc(docRef, { qty: novaQty, ativo: true });
+        allStock[prodId] = { ...s, id: docs.docs[0].id, qty: novaQty, ativo: true };
+      }
+      transferidos++;
+    } catch(e) {
+      console.warn("Erro ao transferir para PE:", prodId, e);
+      erros++;
+    }
+  }
+
+  fecharModalTransfPE();
+
+  if (transferidos > 0 && erros === 0) {
+    showToast(`✅ ${transferidos} produto${transferidos!==1?"s":""} adicionado${transferidos!==1?"s":""} à Pronta Entrega!`);
+  } else if (transferidos > 0) {
+    showToast(`⚠️ ${transferidos} transferido${transferidos!==1?"s":""}, ${erros} com erro.`);
+  } else if (erros > 0) {
+    showToast("❌ Erro ao transferir para Pronta Entrega.");
+  } else {
+    showToast("Nenhuma unidade informada para transferir.");
+  }
+
+  renderStockAdmin();
+  renderPEProducts();
+}
+
+async function renderBaixaHistorico() {
+  const el = document.getElementById("baixa-historico");
+  if (!el) return;
+  let logs = [];
+  try { logs = await fbGet("producaoLog"); } catch {}
+  if (logs.length === 0) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:13px;">Nenhuma produção registrada ainda.</div>`;
+    return;
+  }
+  // Ordena mais recente primeiro
+  logs.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  el.innerHTML = logs.slice(0, 20).map(log => `
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--border);">
+      <div style="width:38px;height:38px;border-radius:50%;background:var(--gold-pale);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🧁</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:500;color:var(--text);">${log.itens || "—"}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${log.data || ""} às ${log.hora || ""}</div>
+        <div style="font-size:11px;color:var(--teal-dark);margin-top:4px;">
+          Descontados: ${Object.entries(log.descontos || {}).map(([n,g])=>`${n}: ${g}g`).join(" · ")}
+        </div>
+      </div>
+    </div>`).join("");
+}
+
+async function interpretarProducaoIA() {
+  const input = document.getElementById("baixa-ia-input");
+  const texto = input.value.trim();
+  if (!texto) { showToast("Descreva o que produziu!"); return; }
+
+  const btn = document.getElementById("baixa-ia-btn");
+  const fb  = document.getElementById("baixa-ia-feedback");
+  btn.disabled = true;
+  fb.textContent = "Interpretando...";
+
+  const produtosDisponiveis = allProducts
+    .filter(p => p.ingredientes && p.ingredientes.length > 0)
+    .map(p => `"${p.nome}" (id:${p.id})`)
+    .join(", ");
+
+  const prompt = `Analise este texto de produção de uma confeitaria e extraia os produtos e quantidades de lotes.
+Texto: "${texto}"
+Produtos disponíveis no sistema: ${produtosDisponiveis || "nenhum cadastrado com receita"}
+
+Responda SOMENTE com um JSON válido neste formato (sem markdown, sem explicação):
+[{"prodId":"ID_DO_PRODUTO","lotes":NUMERO},...]
+
+Se um produto mencionado não existir na lista, use o nome mais próximo. Se não encontrar nenhum, retorne [].`;
+
+  try {
+    const resposta = await callGeminiAPI(prompt, 200, "Você é um extrator de dados preciso. Responda APENAS com JSON válido, sem formatação.");
+    const clean = resposta.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(clean);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      fb.textContent = "Não consegui identificar produtos. Adicione manualmente abaixo.";
+      btn.disabled = false;
+      return;
+    }
+    let adicionados = 0;
+    parsed.forEach(item => {
+      const prod = allProducts.find(p => p.id === item.prodId);
+      if (!prod || !prod.ingredientes || prod.ingredientes.length === 0) return;
+      const lotes = parseInt(item.lotes) || 1;
+      const existente = baixaItens.findIndex(b => b.prodId === item.prodId);
+      if (existente >= 0) {
+        baixaItens[existente].lotes += lotes;
+      } else {
+        baixaItens.push({
+          prodId: prod.id,
+          prodNome: prod.nome,
+          emoji: prod.emoji || "🍪",
+          ingredientes: (prod.ingredientes || []).map(pi => {
+            const ing = allIngredients.find(i => i.id === pi.ingId);
+            return { ingId: pi.ingId, ingNome: ing ? ing.nome : pi.ingId, gramsPorLote: pi.grams || 0 };
+          }),
+          lotes
+        });
+      }
+      adicionados++;
+    });
+    renderBaixaItens();
+    fb.textContent = adicionados > 0 ? `✅ ${adicionados} produto(s) adicionado(s)! Confira abaixo e confirme.` : "Não encontrei produtos com receita cadastrada para o que você descreveu.";
+    input.value = "";
+  } catch(e) {
+    fb.textContent = "Erro ao interpretar. Configure a GEMINI_API_KEY ou adicione manualmente.";
+  }
+  btn.disabled = false;
 }
 
 // ─── DASHBOARD ─────────────────────────────────────────
@@ -5653,7 +6206,8 @@ function getBusinessContext() {
   return `Período: ${periodMode} | Faturamento: R$${fat.toFixed(2)} | Lucro estimado: R$${lucro.toFixed(2)} | Pedidos: ${orders.length} | Top produtos: ${top||"—"} | Ingredientes baixos: ${lowIng||"nenhum"} | Total clientes: ${allOrders.length}`;
 }
 
-let iaHistory = [{ role:"system", content:`Você é consultora especializada em confeitaria artesanal e negócios. Responda em português, de forma prática e direta.` }];
+let iaHistory = [];
+const IA_SYSTEM = `Você é consultora especializada em confeitaria artesanal e negócios. Responda em português, de forma prática e direta.`;
 
 async function askIA() {
   const input = document.getElementById("ia-input");
@@ -5666,13 +6220,13 @@ async function askIA() {
   histEl.innerHTML += `<div id="ia-typing" style="font-size:13px;color:rgba(255,255,255,0.5);padding:8px;">Digitando...</div>`;
   histEl.scrollTop = histEl.scrollHeight;
   try {
-    const answer = await callClaudeAPI(q + "\n\nContexto: " + getBusinessContext(), 300);
+    const answer = await callGeminiAPI(q + "\n\nContexto do negócio: " + getBusinessContext(), 300, IA_SYSTEM);
     document.getElementById("ia-typing").remove();
     histEl.innerHTML += `<div style="background:rgba(200,144,42,0.1);border-left:3px solid var(--gold);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:rgba(255,255,255,0.9);"><strong>IA:</strong> ${answer}</div>`;
     iaHistory.push({ role:"assistant", content: answer });
   } catch {
     document.getElementById("ia-typing").remove();
-    histEl.innerHTML += `<div style="font-size:13px;color:rgba(255,255,255,0.5);padding:8px;">Configure a API key da Anthropic para ativar a IA.</div>`;
+    histEl.innerHTML += `<div style="font-size:13px;color:rgba(255,255,255,0.5);padding:8px;">Configure a GEMINI_API_KEY no Vercel para ativar a IA.</div>`;
   }
   histEl.scrollTop = histEl.scrollHeight;
 }
@@ -5688,7 +6242,7 @@ async function generateMktPost() {
   document.getElementById("mkt-result").innerHTML = `<div style="color:var(--muted);font-size:13px;padding:20px 0;">Gerando postagem...</div>`;
   const prompt = `Você é especialista em marketing para confeitarias artesanais. Crie uma postagem de ${selectedMktOpt} para a Panillo, confeitaria de cookies e brownies artesanais em Fortaleza.\n\nProduto/campanha: ${text}\n\nGere uma legenda envolvente, autêntica, com emojis e no final inclua hashtags relevantes. Máximo 200 palavras. Responda somente com o texto da postagem, sem explicações adicionais.`;
   try {
-    const post = await callClaudeAPI(prompt, 300);
+    const post = await callGeminiAPI(prompt, 300, "Você é especialista em marketing digital para confeitarias artesanais. Responda apenas com o texto da postagem, sem explicações.");
     const tags = post.match(/#\w+/g) || [];
     const body = post.replace(/#\w+/g,"").trim();
     document.getElementById("mkt-result").innerHTML = `
@@ -5699,7 +6253,7 @@ async function generateMktPost() {
       </div>
       <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('mkt-post-text').textContent + ' ' + '${tags.join(" ")}').then(()=>showToast('Copiado!'))">Copiar texto</button>`;
   } catch {
-    document.getElementById("mkt-result").innerHTML = `<div style="color:var(--muted);font-size:13px;">Configure a API key da Anthropic para usar a IA de marketing.</div>`;
+    document.getElementById("mkt-result").innerHTML = `<div style="color:var(--muted);font-size:13px;">Configure a GEMINI_API_KEY no Vercel para usar a IA de marketing.</div>`;
   }
 }
 
@@ -5710,43 +6264,58 @@ async function generateDesc() {
   const icon = document.getElementById("desc-icon");
   const spin = document.getElementById("desc-spinner");
   icon.style.display = "none"; spin.style.display = "inline-block";
-  const prompt = `Crie uma descrição curta e irresistível para o produto "${nome}" de uma confeitaria artesanal. Máximo 2 frases, sensorial, que desperte desejo. Sem aspas, sem explicações, só o texto.`;
+
+  // Coleta ingredientes já adicionados no modal para enriquecer a descrição
+  const ingRows = document.querySelectorAll("#pm-ings .ing-row-modal");
+  const ingredientesNomes = [];
+  ingRows.forEach(row => {
+    const sel = row.querySelector("select");
+    if (sel && sel.value) {
+      const ing = allIngredients.find(i => i.id === sel.value);
+      if (ing) ingredientesNomes.push(ing.nome);
+    }
+  });
+  const categoria = document.getElementById("pm-cat")?.value || "cookie";
+  const catLabel = categoria === "brownie" ? "brownie" : categoria === "combo" ? "combo de cookies e brownies" : "cookie";
+
+  let promptIngredientes = "";
+  if (ingredientesNomes.length > 0) {
+    promptIngredientes = `\nIngredientes principais: ${ingredientesNomes.join(", ")}.`;
+  }
+
+  const prompt = `Você é especialista em copywriting para confeitaria artesanal premium.
+Crie uma descrição curta, única e irresistível para o ${catLabel} chamado "${nome}".${promptIngredientes}
+Requisitos:
+- Máximo 2 frases curtas
+- Tom sensorial: evoque sabores, texturas, aromas
+- Destaque o que torna este produto especial com base no nome e ingredientes
+- Linguagem calorosa e artesanal, sem clichês genéricos
+- Sem aspas, sem explicações, apenas o texto da descrição
+NÃO use frases genéricas como "feito com ingredientes selecionados" — seja específico ao nome "${nome}".`;
+
   try {
-    const desc = await callClaudeAPI(prompt, 80);
+    const desc = await callGeminiAPI(prompt, 100);
     document.getElementById("pm-desc").value = desc;
   } catch {
-    document.getElementById("pm-desc").value = `${nome} artesanal, feito com ingredientes selecionados para uma experiência única a cada mordida.`;
+    // Fallback descritivo baseado no nome
+    const categoriaText = categoria === "brownie" ? "Brownie" : categoria === "combo" ? "Combo" : "Cookie";
+    document.getElementById("pm-desc").value = `${categoriaText} ${nome} artesanal, com sabor único e textura irresistível em cada mordida.`;
   }
   icon.style.display = "inline-block"; spin.style.display = "none";
 }
 
-// ─── CLAUDE API (via proxy seguro /api/claude) ─────────
-// A chave fica no Vercel como variável de ambiente — nunca exposta no browser.
-async function callClaudeAPI(prompt, maxTokens = 200) {
-  // Tenta o formato messages (padrão Anthropic nativo)
-  const body = {
-    model: "claude-haiku-4-5",
-    max_tokens: maxTokens,
-    messages: [{ role: "user", content: prompt }]
-  };
+// ─── GEMINI API (via proxy seguro /api/gemini) ─────────
+// A chave fica no Vercel como GEMINI_API_KEY — nunca exposta no browser.
+async function callGeminiAPI(prompt, maxTokens = 200, systemPrompt = "") {
   let resp;
   try {
-    resp = await fetch("/api/claude", {
+    resp = await fetch("/api/gemini", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ prompt, maxTokens, systemPrompt })
     });
   } catch (e) {
     throw new Error("Sem conexão com a API");
-  }
-
-  // Se 400/404 com formato messages, tenta o formato legado { prompt, maxTokens }
-  if (!resp.ok && (resp.status === 400 || resp.status === 422)) {
-    resp = await fetch("/api/claude", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, maxTokens })
-    });
   }
 
   if (!resp.ok) {
@@ -5756,12 +6325,11 @@ async function callClaudeAPI(prompt, maxTokens = 200) {
 
   const data = await resp.json();
   if (data.error) throw new Error(data.error);
-  // Suporta resposta no formato Anthropic { content: [{text}] } ou legado { text }
-  if (data.content && Array.isArray(data.content)) {
-    return data.content.map(c => c.text || "").join("").trim();
-  }
-  return (data.text || data.completion || "").trim();
+  return (data.text || "").trim();
 }
+
+// Alias para compatibilidade (caso algum trecho ainda chame callClaudeAPI)
+const callClaudeAPI = (prompt, maxTokens = 200) => callGeminiAPI(prompt, maxTokens);
 
 // ─── PERIOD TOGGLE ─────────────────────────────────────
 function togglePeriod() {
