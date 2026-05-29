@@ -4370,7 +4370,28 @@ function renderOrders() {
           <td>${o.dataRetirada ? new Date(o.dataRetirada+"T12:00").toLocaleDateString("pt-BR") : "—"}<br><span style="font-size:11px;color:var(--muted);">${o.periodo||""}</span></td>
           <td>${paySelect}</td>
           <td>${payPaid}</td>
-          <td><strong>R$ ${Number(o.total||0).toFixed(2).replace(".",",")}</strong>${o.descontoAplicado?`<br><span style="font-size:10px;color:#0F6E56;">-${o.descontoAplicado}%</span>`:""}</td>
+          <td>
+            <strong>R$ ${Number(o.totalComDesconto ?? o.total ?? 0).toFixed(2).replace(".",",")}</strong>
+            ${o.descontoAplicado ? `<br><span style="font-size:10px;color:#0F6E56;">-${o.descontoAplicado}%</span>` : ""}
+            ${o.descontoAdmin ? `<br><span style="font-size:10px;color:#0F6E56;">-R$ ${Number(o.descontoAdmin).toFixed(2).replace(".",",")} (admin)</span>` : ""}
+            <div id="desc-form-${o.id}" style="display:none;margin-top:6px;">
+              <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                <input type="number" id="desc-val-${o.id}" placeholder="Valor" min="0" step="0.01"
+                  style="width:72px;padding:4px 6px;border:1px solid var(--border-mid);border-radius:6px;font-size:12px;"
+                  onkeydown="if(event.key==='Enter')applyOrderDiscount('${o.id}')">
+                <select id="desc-tipo-${o.id}" style="padding:4px 5px;border:1px solid var(--border-mid);border-radius:6px;font-size:12px;">
+                  <option value="reais">R$</option>
+                  <option value="pct">%</option>
+                </select>
+                <button onclick="applyOrderDiscount('${o.id}')" style="background:var(--teal);color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer;">&#10003;</button>
+                <button onclick="toggleDescForm('${o.id}')" style="background:none;border:1px solid var(--border-mid);padding:4px 6px;border-radius:6px;font-size:11px;cursor:pointer;color:var(--muted);">&#10005;</button>
+              </div>
+            </div>
+            <button onclick="toggleDescForm('${o.id}')"
+              style="margin-top:5px;background:none;border:1px dashed var(--teal-light);color:var(--teal);padding:3px 8px;border-radius:6px;font-size:10px;cursor:pointer;">
+              &#127991; Desconto
+            </button>
+          </td>
           <td><span class="status-badge ${statusClass(o.status)}">${statusLabel(o.status)}</span></td>
           <td>
             <div style="display:flex;flex-direction:column;gap:6px;">
@@ -4411,6 +4432,48 @@ function goOrdersPage(p) {
   const totalPages = Math.max(1, Math.ceil(list.length / ORDERS_PER_PAGE));
   ordersPage = Math.min(Math.max(1, p), totalPages);
   renderOrders();
+}
+
+function toggleDescForm(orderId) {
+  const el = document.getElementById("desc-form-" + orderId);
+  if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+async function applyOrderDiscount(orderId) {
+  const valEl  = document.getElementById("desc-val-"  + orderId);
+  const tipoEl = document.getElementById("desc-tipo-" + orderId);
+  const val    = parseFloat(valEl?.value);
+  const tipo   = tipoEl?.value || "reais";
+  if (!val || val <= 0) { showToast("Informe um valor de desconto válido!"); return; }
+
+  const order = allOrders.find(o => o.id === orderId);
+  if (!order) return;
+
+  const totalOriginal = order.totalOriginal ?? order.total ?? 0;
+  let descReais;
+  if (tipo === "pct") {
+    if (val > 100) { showToast("Percentual não pode ser maior que 100%!"); return; }
+    descReais = totalOriginal * val / 100;
+  } else {
+    descReais = val;
+  }
+  descReais = Math.min(descReais, totalOriginal);
+  const novoTotal = Math.max(0, totalOriginal - descReais);
+
+  try {
+    await fbUpdate("orders", orderId, {
+      descontoAdmin: descReais,
+      descontoAdminTipo: tipo,
+      totalOriginal: totalOriginal,
+      totalComDesconto: novoTotal
+    });
+    allOrders = allOrders.map(o => o.id === orderId
+      ? { ...o, descontoAdmin: descReais, descontoAdminTipo: tipo, totalOriginal, totalComDesconto: novoTotal }
+      : o);
+    showToast("Desconto de R$ " + descReais.toFixed(2).replace(".",",") + " aplicado!");
+    renderOrders();
+    addAuditLog(orderId, "Desconto admin: -R$ " + descReais.toFixed(2) + " (" + (tipo === "pct" ? val + "%" : "fixo") + ")");
+  } catch(e) { showToast("Erro ao salvar desconto"); console.error(e); }
 }
 
 function payLabel(p) { return { pix:"Pix", credito:"Crédito", debito:"Débito", fiado:"Fiado" }[p] || p || "—"; }
@@ -5015,15 +5078,21 @@ async function renderFiadoAdmin() {
         ${hist.length === 0 ? '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Nenhum lançamento ainda.</div>' :
           hist.map(h => {
             const isDeb = h.tipo === "pedido";
+            const isDesc = h.tipo === "desconto";
+            const dotClass = isDeb ? "hist-dot-pedido" : isDesc ? "hist-dot-desconto" : "hist-dot-pagto";
+            const icon     = isDeb ? "ti-shopping-bag" : isDesc ? "ti-tag" : "ti-cash";
+            const valClass = isDeb ? "debit" : "credit";
+            const prefix   = isDeb ? "+" : "-";
+            const label    = h.descricao || (isDeb ? "Pedido" : isDesc ? "Desconto" : "Pagamento");
             return `<div class="fcc-hist-item">
-              <div class="fcc-hist-dot ${isDeb?'hist-dot-pedido':'hist-dot-pagto'}">
-                <i class="ti ${isDeb?'ti-shopping-bag':'ti-cash'}"></i>
+              <div class="fcc-hist-dot ${dotClass}">
+                <i class="ti ${icon}"></i>
               </div>
               <div class="fcc-hist-info">
-                <div class="fcc-hist-desc">${h.descricao || (isDeb?"Pedido":"Pagamento")}</div>
+                <div class="fcc-hist-desc">${label}</div>
                 <div class="fcc-hist-date">${h.data || "—"}</div>
               </div>
-              <div class="fcc-hist-val ${isDeb?'debit':'credit'}">${isDeb?'+':'-'}R$ ${Number(h.valor||0).toFixed(2).replace(".",",")}</div>
+              <div class="fcc-hist-val ${valClass}">${prefix}R$ ${Number(h.valor||0).toFixed(2).replace(".",",")}</div>
             </div>`;
           }).join("")}
         <div class="fcc-action-row">
@@ -5037,6 +5106,14 @@ async function renderFiadoAdmin() {
         <div class="fcc-pagto-form" id="fpagto-${a.id}">
           <label>Valor recebido (R$) *</label>
           <input class="fi" type="number" id="fpval-${a.id}" placeholder="Ex: 50.00" step="0.01" min="0.01">
+          <label>Desconto (opcional)</label>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+            <input class="fi" type="number" id="fpdesc-${a.id}" placeholder="Ex: 10" step="0.01" min="0" style="flex:1;margin-bottom:0;">
+            <select id="fpdesc-tipo-${a.id}" style="padding:8px 10px;border:1px solid var(--border-mid);border-radius:8px;font-size:13px;background:#fff;min-width:60px;">
+              <option value="reais">R$</option>
+              <option value="pct">%</option>
+            </select>
+          </div>
           <label>Forma de pagamento</label>
           <input class="fi" type="text" id="fpmet-${a.id}" placeholder="Ex: Pix, dinheiro, cartão...">
           <label>Observação (opcional)</label>
@@ -5072,28 +5149,56 @@ function toggleFiadoForm(id) {
 }
 
 async function registerFiadoPayment(accountId, currentSaldo) {
-  const valInput = document.getElementById("fpval-" + accountId);
-  const metInput = document.getElementById("fpmet-" + accountId);
-  const obsInput = document.getElementById("fpobs-" + accountId);
+  const valInput   = document.getElementById("fpval-"       + accountId);
+  const metInput   = document.getElementById("fpmet-"       + accountId);
+  const obsInput   = document.getElementById("fpobs-"       + accountId);
+  const descInput  = document.getElementById("fpdesc-"      + accountId);
+  const descTipo   = document.getElementById("fpdesc-tipo-" + accountId);
+
   const val = parseFloat(valInput?.value);
   if (!val || val <= 0) { showToast("Informe um valor válido!"); return; }
 
-  const newSaldo = Math.max(0, currentSaldo - val);
+  // Calcula desconto
+  let descReais = 0;
+  const descVal = parseFloat(descInput?.value) || 0;
+  if (descVal > 0) {
+    const tipo = descTipo?.value || "reais";
+    descReais = tipo === "pct" ? currentSaldo * descVal / 100 : descVal;
+    descReais = Math.min(descReais, currentSaldo);
+  }
+
+  const totalAbatido = val + descReais;
+  const newSaldo = Math.max(0, currentSaldo - totalAbatido);
   const now = new Date();
   const dateStr = now.toLocaleDateString("pt-BR");
 
   try {
     const account = allFiadoAccounts.find(a => a.id === accountId);
     if (!account) return;
-    const newHist = [...(account.historico || []), {
+
+    const entries = [];
+    entries.push({
       tipo: "pagamento",
-      descricao: `Pagamento recebido${metInput?.value ? " — " + metInput.value : ""}${obsInput?.value ? " (" + obsInput.value + ")" : ""}`,
+      descricao: "Pagamento recebido" + (metInput?.value ? " — " + metInput.value : "") + (obsInput?.value ? " (" + obsInput.value + ")" : ""),
       valor: val,
       data: dateStr
-    }];
+    });
+    if (descReais > 0) {
+      entries.push({
+        tipo: "desconto",
+        descricao: "Desconto aplicado pelo admin" + (obsInput?.value ? " (" + obsInput.value + ")" : ""),
+        valor: descReais,
+        data: dateStr
+      });
+    }
+
+    const newHist = [...(account.historico || []), ...entries];
     await fbUpdate("fiadoAccounts", accountId, { saldo: newSaldo, historico: newHist });
     allFiadoAccounts = allFiadoAccounts.map(a => a.id === accountId ? { ...a, saldo: newSaldo, historico: newHist } : a);
-    showToast(`Pagamento de R$ ${val.toFixed(2).replace(".",",")} registrado!`);
+
+    let msg = "Pagamento de R$ " + val.toFixed(2).replace(".",",") + " registrado!";
+    if (descReais > 0) msg += " + desconto de R$ " + descReais.toFixed(2).replace(".",",");
+    showToast(msg);
     renderFiadoAdmin();
   } catch(e) { showToast("Erro ao registrar pagamento"); console.error(e); }
 }
@@ -8470,6 +8575,8 @@ renderClients = async function() {
 .hist-dot-pedido i { color: #0F6E56; font-size: 14px; }
 .hist-dot-pagto { background: #FDF6E8; }
 .hist-dot-pagto i { color: #854F0B; font-size: 14px; }
+.hist-dot-desconto { background: #EEF6FF; }
+.hist-dot-desconto i { color: #1A5DC8; font-size: 14px; }
 .fcc-hist-info { flex: 1; }
 .fcc-hist-desc { font-size: 12px; color: var(--teal-dark); font-weight: 500; }
 .fcc-hist-date { font-size: 10px; color: var(--muted); margin-top: 1px; }
