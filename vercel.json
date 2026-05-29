@@ -14,7 +14,10 @@
         { "key": "Cache-Control", "value": "no-cache" }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/gemini.js": {
+      "maxDuration": 30
+    }
+  }
 }
-
-
