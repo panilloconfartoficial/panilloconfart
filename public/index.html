@@ -3427,7 +3427,7 @@ async function fbUpdate(col, id, data) {
 }
 async function fbGet(col) {
   const snap = await FB.getDocs(FB.collection(db, col));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ ...d.data(), id: d.id }));
 }
 
 // ─── TOAST ─────────────────────────────────────────────
