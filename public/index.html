@@ -3483,7 +3483,7 @@ window.addEventListener("firebase-ready", () => {
       const onAdminRoute = window.location.pathname === "/admin" || window.location.pathname === "/admin/";
       if (loginActive || onAdminRoute) {
         showPage("page-admin");
-        loadDashboard();
+        // loadDashboard será chamado automaticamente dentro de loadOrders()
         showMobBottomNav(true);
       }
     }
@@ -3491,8 +3491,7 @@ window.addEventListener("firebase-ready", () => {
 
   loadProducts();
   loadIngredients();
-  loadOrders();
-  loadDashboard();
+  loadOrders(); // loadDashboard será chamado dentro de loadOrders após buscar dados
   loadStock();
   loadFiadoAccounts();
   // Após carregar pedidos e estoque, reconcilia qualquer desconto pendente
@@ -3552,7 +3551,7 @@ async function doLogin() {
   try {
     await FB.signInWithEmailAndPassword(auth, email, pass);
     showPage("page-admin");
-    loadDashboard();
+    loadOrders(); // carrega pedidos e atualiza dashboard
     showMobBottomNav(true);
     // Ativa notificações push para o admin
     setupAdminPushNotifications();
@@ -4449,6 +4448,8 @@ async function loadOrders() {
   const badge = allOrders.filter(o => o.status === "pendente").length;
   document.getElementById("badge-pedidos").textContent = badge;
   updateMbnBadge(badge);
+  // Atualiza dashboard após carregar pedidos (garante dados corretos)
+  loadDashboard();
 }
 
 let ordersPage = 1;
@@ -7096,12 +7097,6 @@ async function callGeminiAPI(prompt, maxTokens = 200, systemPrompt = "") {
 // Alias para compatibilidade (caso algum trecho ainda chame callClaudeAPI)
 const callClaudeAPI = (prompt, maxTokens = 200) => callGeminiAPI(prompt, maxTokens);
 
-// ─── PERIOD TOGGLE ─────────────────────────────────────
-function togglePeriod() {
-  periodMode = periodMode === "mes" ? "semana" : periodMode === "semana" ? "ano" : "mes";
-  const labels = { mes:"Este mês", semana:"Esta semana", ano:"Este ano" };
-  document.getElementById("period-btn").textContent = labels[periodMode];
-}
 let _currentPhotoBase64 = null;
 let _currentFotoPos = { x: 50, y: 50, zoom: 100 };
 
