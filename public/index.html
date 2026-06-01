@@ -2439,10 +2439,16 @@ img { max-width: 100%; display: block; }
           <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
           <div class="admin-page-title">Indicadores Financeiros</div>
         </div>
-        <div style="display:flex;gap:10px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <button class="btn-sm-outline" onclick="loadIndicadores('semana')" id="ind-btn-semana">7 dias</button>
           <button class="btn-sm-outline active" onclick="loadIndicadores('mes')" id="ind-btn-mes" style="background:var(--teal);color:#fff;border-color:var(--teal);">30 dias</button>
           <button class="btn-sm-outline" onclick="loadIndicadores('ano')" id="ind-btn-ano">12 meses</button>
+          <div style="display:flex;align-items:center;gap:4px;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:4px 8px;" id="ind-custom-range">
+            <input type="date" id="ind-date-from" style="border:none;outline:none;font-size:12px;color:var(--text);background:transparent;cursor:pointer;">
+            <span style="color:var(--muted);font-size:11px;">até</span>
+            <input type="date" id="ind-date-to" style="border:none;outline:none;font-size:12px;color:var(--text);background:transparent;cursor:pointer;">
+            <button onclick="loadIndicadores('custom')" style="background:var(--teal);color:#fff;border:none;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">Aplicar</button>
+          </div>
         </div>
       </div>
       <div class="admin-content">
@@ -2589,6 +2595,35 @@ img { max-width: 100%; display: block; }
           <button class="sf-btn" onclick="filterOrders('pronto',this)">Prontos</button>
           <button class="sf-btn" onclick="filterOrders('entregue',this)">Entregues</button>
           <button class="sf-btn" onclick="filterOrders('cancelado',this)">Cancelados</button>
+        </div>
+        <!-- Filtros extras: pagamento + confirmação + ordenação -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+          <select id="orders-filter-pag" onchange="ordersPage=1;renderOrders()"
+            style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--text);cursor:pointer;">
+            <option value="todos">💳 Todas as formas</option>
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="credito">Cartão Crédito</option>
+            <option value="debito">Cartão Débito</option>
+            <option value="fiado">Fiado</option>
+          </select>
+          <select id="orders-filter-conf" onchange="ordersPage=1;renderOrders()"
+            style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--text);cursor:pointer;">
+            <option value="todos">✅ Confirmação</option>
+            <option value="pago">✓ Pagos</option>
+            <option value="pendente">Confirmar pag.</option>
+          </select>
+          <select id="orders-sort" onchange="ordersPage=1;renderOrders()"
+            style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--text);cursor:pointer;">
+            <option value="data-desc">📅 Mais recentes</option>
+            <option value="data-asc">📅 Mais antigos</option>
+            <option value="nome-az">A→Z Cliente</option>
+            <option value="nome-za">Z→A Cliente</option>
+            <option value="valor-maior">R$ Maior valor</option>
+            <option value="valor-menor">R$ Menor valor</option>
+            <option value="retirada-asc">Retirada próxima</option>
+          </select>
+          <span id="orders-count" style="font-size:12px;color:var(--muted);margin-left:auto;white-space:nowrap;"></span>
         </div>
         <div class="admin-card" style="padding:0;overflow:hidden;">
           <table class="orders-table">
@@ -2746,10 +2781,16 @@ img { max-width: 100%; display: block; }
           <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
           <div class="admin-page-title">Fluxo de Caixa</div>
         </div>
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <button class="btn-sm-outline" onclick="loadFluxo('semana')" id="fluxo-btn-s">7 dias</button>
           <button class="btn-sm-outline" id="fluxo-btn-m" style="background:var(--teal);color:#fff;border-color:var(--teal);" onclick="loadFluxo('mes')">30 dias</button>
           <button class="btn-sm-outline" onclick="loadFluxo('ano')" id="fluxo-btn-a">12 meses</button>
+          <div style="display:flex;align-items:center;gap:4px;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:4px 8px;">
+            <input type="date" id="fluxo-date-from" style="border:none;outline:none;font-size:12px;color:var(--text);background:transparent;cursor:pointer;">
+            <span style="color:var(--muted);font-size:11px;">até</span>
+            <input type="date" id="fluxo-date-to" style="border:none;outline:none;font-size:12px;color:var(--text);background:transparent;cursor:pointer;">
+            <button onclick="loadFluxo('custom')" style="background:var(--teal);color:#fff;border:none;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">Aplicar</button>
+          </div>
         </div>
       </div>
       <div class="admin-content">
@@ -3575,9 +3616,28 @@ function showAdminSection(sec, el) {
   if (sec === "historico")   loadHistoricoAdmin();
   if (sec === "suprimentos") renderIngredients();
   if (sec === "ia")          renderIASection();
-  if (sec === "indicadores") loadIndicadores("mes");
+  if (sec === "indicadores") {
+    // Preenche datas padrão se ainda não preenchidas
+    const today = new Date().toISOString().split("T")[0];
+    const d30   = new Date(); d30.setDate(d30.getDate()-30);
+    const from30 = d30.toISOString().split("T")[0];
+    const df = document.getElementById("ind-date-from");
+    const dt = document.getElementById("ind-date-to");
+    if (df && !df.value) df.value = from30;
+    if (dt && !dt.value) dt.value = today;
+    loadIndicadores("mes");
+  }
   if (sec === "metas")       loadMetas();
-  if (sec === "fluxo")       loadFluxo();
+  if (sec === "fluxo") {
+    const today = new Date().toISOString().split("T")[0];
+    const d30   = new Date(); d30.setDate(d30.getDate()-30);
+    const from30 = d30.toISOString().split("T")[0];
+    const df = document.getElementById("fluxo-date-from");
+    const dt = document.getElementById("fluxo-date-to");
+    if (df && !df.value) df.value = from30;
+    if (dt && !dt.value) dt.value = today;
+    loadFluxo();
+  }
   if (sec === "producao")    loadProducao();
 }
 
@@ -4396,20 +4456,52 @@ const ORDERS_PER_PAGE = 20;
 
 function renderOrders() {
   const q = (document.getElementById("orders-search")?.value || "").toLowerCase();
+  const filterPag  = document.getElementById("orders-filter-pag")?.value  || "todos";
+  const filterConf = document.getElementById("orders-filter-conf")?.value || "todos";
+  const sort       = document.getElementById("orders-sort")?.value         || "data-desc";
+
   let list = orderFilterStatus === "todos" ? allOrders : allOrders.filter(o => o.status === orderFilterStatus);
+
   if (q) {
     list = list.filter(o =>
       (o.cliente?.nome||"").toLowerCase().includes(q) ||
       (o.cliente?.wpp||"").includes(q) ||
       (o.itens||[]).some(i => i.nome.toLowerCase().includes(q)) ||
-      (o.orderNum||"").toString().includes(q)
+      (o.orderNum||o.numero||"").toString().includes(q)
     );
   }
-  // Sort newest first
-  list = [...list].sort((a,b) => {
-    const da = a.createdAt?.seconds || 0, db2 = b.createdAt?.seconds || 0;
-    return db2 - da;
+
+  // Filtro forma de pagamento
+  if (filterPag !== "todos") list = list.filter(o => o.pagamento === filterPag);
+
+  // Filtro confirmação de pagamento
+  if (filterConf === "pago")    list = list.filter(o => o.pagamentoConfirmado);
+  if (filterConf === "pendente") list = list.filter(o => !o.pagamentoConfirmado);
+
+  // Ordenação
+  list = [...list].sort((a, b) => {
+    switch (sort) {
+      case "data-desc":      return (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0);
+      case "data-asc":       return (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0);
+      case "nome-az":        return (a.cliente?.nome||"").localeCompare(b.cliente?.nome||"", "pt-BR");
+      case "nome-za":        return (b.cliente?.nome||"").localeCompare(a.cliente?.nome||"", "pt-BR");
+      case "valor-maior":    return Number(b.totalComDesconto??b.total??0) - Number(a.totalComDesconto??a.total??0);
+      case "valor-menor":    return Number(a.totalComDesconto??a.total??0) - Number(b.totalComDesconto??b.total??0);
+      case "retirada-asc": {
+        const da = a.dataRetirada ? new Date(a.dataRetirada).getTime() : Infinity;
+        const db2 = b.dataRetirada ? new Date(b.dataRetirada).getTime() : Infinity;
+        return da - db2;
+      }
+      default: return (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0);
+    }
   });
+
+  // Contador
+  const countEl = document.getElementById("orders-count");
+  if (countEl) {
+    const total = allOrders.length;
+    countEl.textContent = list.length < total ? `${list.length} de ${total} pedido(s)` : `${total} pedido(s)`;
+  }
 
   const totalPages = Math.max(1, Math.ceil(list.length / ORDERS_PER_PAGE));
   if (ordersPage > totalPages) ordersPage = totalPages;
@@ -4834,6 +4926,7 @@ async function updateOrderStatus(id, newStatus) {
 
 function filterOrders(status, btn) {
   orderFilterStatus = status;
+  ordersPage = 1;
   document.querySelectorAll(".sf-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   renderOrders();
@@ -7991,6 +8084,9 @@ async function loadIndicadores(mode) {
     if (m === mode) { btn.style.background="var(--teal)"; btn.style.color="#fff"; btn.style.borderColor="var(--teal)"; }
     else { btn.style.background=""; btn.style.color=""; btn.style.borderColor=""; }
   });
+  // Highlight custom range border when active
+  const customRange = document.getElementById("ind-custom-range");
+  if (customRange) customRange.style.borderColor = mode === "custom" ? "var(--teal)" : "var(--border)";
 
   let orders = allOrders;
   if (!orders || orders.length === 0) {
@@ -7998,16 +8094,26 @@ async function loadIndicadores(mode) {
   }
 
   const now = new Date();
-  const cutoff = new Date(now);
-  if (mode === "semana") cutoff.setDate(now.getDate() - 7);
-  else if (mode === "mes") cutoff.setDate(now.getDate() - 30);
-  else cutoff.setFullYear(now.getFullYear() - 1);
+  let cutoff, cutoffEnd, days;
+
+  if (mode === "custom") {
+    const fromVal = document.getElementById("ind-date-from")?.value;
+    const toVal   = document.getElementById("ind-date-to")?.value;
+    if (!fromVal || !toVal) { showToast("Selecione as duas datas!"); return; }
+    cutoff    = new Date(fromVal + "T00:00:00");
+    cutoffEnd = new Date(toVal   + "T23:59:59");
+    days = Math.round((cutoffEnd - cutoff) / (1000*60*60*24)) + 1;
+  } else {
+    days = mode === "semana" ? 7 : mode === "mes" ? 30 : 365;
+    cutoff    = new Date(now); cutoff.setDate(now.getDate() - days);
+    cutoffEnd = now;
+  }
 
   const active = ["confirmado","pronto","entregue"];
   const filtered = orders.filter(o => {
     if (!active.includes(o.status)) return false;
     const ts = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000) : new Date(o.dataRetirada+"T12:00");
-    return ts >= cutoff;
+    return ts >= cutoff && ts <= cutoffEnd;
   });
 
   const totalRec = filtered.reduce((s,o) => s + Number(o.total||0), 0);
@@ -8020,7 +8126,7 @@ async function loadIndicadores(mode) {
   const cancelados = orders.filter(o => {
     if (o.status !== "cancelado") return false;
     const ts = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000) : new Date(o.dataRetirada+"T12:00");
-    return ts >= cutoff;
+    return ts >= cutoff && ts <= cutoffEnd;
   }).length;
 
   // Formas de pagamento
@@ -8047,11 +8153,11 @@ async function loadIndicadores(mode) {
   document.getElementById("ind-fiado").textContent = fmt(fiadoSaldo);
   document.getElementById("ind-formas").innerHTML = formasHtml || "—";
 
-  // Build daily data
-  const days = mode === "semana" ? 7 : mode === "mes" ? 30 : 365;
+  // Build daily data — para custom gera bucket por cada dia do intervalo
   const buckets = {};
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now); d.setDate(now.getDate() - i);
+  for (let i = 0; i < Math.min(days, 366); i++) {
+    const d = new Date(cutoff); d.setDate(cutoff.getDate() + i);
+    if (d > cutoffEnd) break;
     const key = d.toISOString().split("T")[0];
     buckets[key] = { fat: 0, recebido: 0, aReceber: 0, pedidos: 0 };
   }
@@ -8549,8 +8655,10 @@ async function loadFluxo(mode = "mes") {
     b.style.background = ""; b.style.color = ""; b.style.borderColor = "";
   });
   const btnMap = {semana:"s", mes:"m", ano:"a"};
-  const btn = document.getElementById("fluxo-btn-"+btnMap[mode]);
-  if (btn) { btn.style.background="var(--teal)"; btn.style.color="#fff"; btn.style.borderColor="var(--teal)"; }
+  if (mode !== "custom") {
+    const btn = document.getElementById("fluxo-btn-"+btnMap[mode]);
+    if (btn) { btn.style.background="var(--teal)"; btn.style.color="#fff"; btn.style.borderColor="var(--teal)"; }
+  }
 
   let orders = allOrders;
   if (!orders.length) { try { orders = await fbGet("orders"); allOrders = orders; } catch { orders = []; } }
@@ -8558,8 +8666,21 @@ async function loadFluxo(mode = "mes") {
   const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
   const overhead = Number(cfg.overhead || 20) / 100;
   const now = new Date();
-  const days = mode === "semana" ? 7 : mode === "mes" ? 30 : 365;
-  const cutoff = new Date(now); cutoff.setDate(now.getDate() - days);
+
+  let cutoff, cutoffEnd, days;
+
+  if (mode === "custom") {
+    const fromVal = document.getElementById("fluxo-date-from")?.value;
+    const toVal   = document.getElementById("fluxo-date-to")?.value;
+    if (!fromVal || !toVal) { showToast("Selecione as duas datas!"); return; }
+    cutoff    = new Date(fromVal + "T00:00:00");
+    cutoffEnd = new Date(toVal   + "T23:59:59");
+    days = Math.round((cutoffEnd - cutoff) / (1000*60*60*24)) + 1;
+  } else {
+    days = mode === "semana" ? 7 : mode === "mes" ? 30 : 365;
+    cutoff    = new Date(now); cutoff.setDate(now.getDate() - days);
+    cutoffEnd = now;
+  }
 
   // Load metas for reserva %
   let reservaPct = 0;
@@ -8574,13 +8695,14 @@ async function loadFluxo(mode = "mes") {
   const filtered = orders.filter(o => {
     if (!active.includes(o.status)) return false;
     const ts = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000) : new Date(o.dataRetirada+"T12:00");
-    return ts >= cutoff;
+    return ts >= cutoff && ts <= cutoffEnd;
   });
 
-  // Buckets
+  // Buckets — um por dia no intervalo
   const buckets = {};
-  for (let i = days-1; i >= 0; i--) {
-    const d = new Date(now); d.setDate(now.getDate()-i);
+  for (let i = 0; i < Math.min(days, 366); i++) {
+    const d = new Date(cutoff); d.setDate(cutoff.getDate() + i);
+    if (d > cutoffEnd) break;
     const k = d.toISOString().split("T")[0];
     buckets[k] = { entradas:0, confirmado:0, aReceber:0, pedidos:0 };
   }
@@ -8631,7 +8753,7 @@ async function loadFluxo(mode = "mes") {
     const reservaVal = b.entradas * reservaPct;
     const lucroVal   = b.entradas * (1-overhead);
     return `<tr style="border-bottom:1px solid var(--border);">
-      <td style="padding:10px 14px;font-size:12px;">${d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}</td>
+      <td style="padding:10px 14px;font-size:12px;">${d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"})}</td>
       <td style="padding:10px 14px;text-align:right;font-size:12px;font-weight:600;color:var(--teal-dark);">${fmt(b.entradas)}</td>
       <td style="padding:10px 14px;text-align:right;font-size:12px;color:#0F6E56;">${fmt(b.confirmado)}</td>
       <td style="padding:10px 14px;text-align:right;font-size:12px;color:#C8902A;">${fmt(b.aReceber)}</td>
