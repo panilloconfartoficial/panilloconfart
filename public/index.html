@@ -1994,6 +1994,11 @@ img { max-width: 100%; display: block; }
                 <div class="pay-card-label">Débito</div>
                 <div class="pay-card-desc">Pague na retirada</div>
               </div>
+              <div class="pay-card" onclick="selectPay('dinheiro',this)">
+                <div class="pay-card-icon">💵</div>
+                <div class="pay-card-label">Dinheiro</div>
+                <div class="pay-card-desc">Pague na retirada</div>
+              </div>
               <div class="pay-card" id="pay-fiado-card" style="display:none;" onclick="selectPay('fiado',this)">
                 <div class="pay-card-icon">🤝</div>
                 <div class="pay-card-label">Fiado</div>
@@ -2003,8 +2008,8 @@ img { max-width: 100%; display: block; }
           </div>
           <div id="pix-details" class="hidden">
             <div class="pix-box">
-              <div style="font-size:13px;color:var(--muted);">Chave Pix (e-mail)</div>
-              <div class="pix-key">panilloconfart@gmail.com</div>
+              <div style="font-size:13px;color:var(--muted);">Chave Pix</div>
+              <div class="pix-key" id="checkout-pix-key-display">—</div>
               <div class="pix-note">Envie o comprovante via WhatsApp após o pagamento para confirmar seu pedido.</div>
             </div>
           </div>
@@ -2328,6 +2333,11 @@ img { max-width: 100%; display: block; }
       <span class="sb-label">IA Negócios</span>
     </div>
     <div class="sb-section">Sistema</div>
+    <div class="sb-item" onclick="showAdminSection('historico',this)">
+      <i class="ti ti-history sb-icon"></i>
+      <span class="sb-label">Histórico</span>
+      <span class="sb-badge" id="badge-historico" style="display:none;">!</span>
+    </div>
     <div class="sb-item" onclick="showAdminSection('config',this)">
       <i class="ti ti-settings sb-icon"></i>
       <span class="sb-label">Configurações</span>
@@ -3214,6 +3224,50 @@ img { max-width: 100%; display: block; }
       </div>
     </div>
 
+
+    <!-- ── HISTÓRICO DO SISTEMA ── -->
+    <div id="sec-historico" class="hidden">
+      <div class="admin-topbar">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="hamburger" id="admin-hamburger-hist" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+          <div class="admin-page-title">Histórico do Sistema</div>
+        </div>
+        <div class="topbar-right" style="gap:8px;display:flex;align-items:center;">
+          <select id="hist-filter-tipo" onchange="renderHistoricoAdmin()" style="padding:7px 10px;border:1px solid var(--border-mid);border-radius:8px;font-size:12px;background:#fff;">
+            <option value="todos">Todos os eventos</option>
+            <option value="pedido">Pedidos</option>
+            <option value="pagamento">Pagamentos</option>
+            <option value="status">Status</option>
+            <option value="fiado">Fiado</option>
+            <option value="estoque">Estoque</option>
+            <option value="desconto">Descontos</option>
+            <option value="cliente">Clientes</option>
+          </select>
+          <button class="btn-sm-outline" onclick="exportHistoricoCSV()" style="font-size:12px;">⬇ Exportar</button>
+        </div>
+      </div>
+      <div style="padding:20px 24px;">
+        <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div class="fd-card" style="flex:1;min-width:120px;">
+            <div class="fd-label">Total de eventos</div>
+            <div class="fd-val" id="hist-total-count">—</div>
+          </div>
+          <div class="fd-card" style="flex:1;min-width:120px;">
+            <div class="fd-label">Hoje</div>
+            <div class="fd-val" id="hist-today-count">—</div>
+          </div>
+          <div class="fd-card" style="flex:1;min-width:120px;">
+            <div class="fd-label">Esta semana</div>
+            <div class="fd-val" id="hist-week-count">—</div>
+          </div>
+        </div>
+        <div id="hist-list" style="display:flex;flex-direction:column;gap:6px;">
+          <div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;">Carregando histórico...</div>
+        </div>
+        <div id="hist-pagination" style="display:flex;gap:4px;margin-top:16px;align-items:center;flex-wrap:wrap;"></div>
+      </div>
+    </div>
+
   </main>
 </div><!-- /page-admin -->
 
@@ -3402,12 +3456,9 @@ window.addEventListener("firebase-ready", () => {
   loadFiadoAccounts();
   // Após carregar pedidos e estoque, reconcilia qualquer desconto pendente
   Promise.all([
-    fbGet("orders").catch(() => []),
-    fbGet("stock").catch(() => [])
-  ]).then(([orders, stockDocs]) => {
-    // allOrders e allStock já foram populados pelas funções acima;
-    // aguarda um tick para garantir que estejam prontos antes de reconciliar
-    setTimeout(reconcileStock, 1500);
+    new Promise(r => setTimeout(r, 1200)) // aguarda loadOrders e loadStock acima
+  ]).then(() => {
+    reconcileStock();
     // Load clients for birthday alerts (background)
     setTimeout(async () => {
       try {
@@ -3415,7 +3466,7 @@ window.addEventListener("firebase-ready", () => {
         allClients = clients;
         renderBdayAlerts(clients);
       } catch {}
-    }, 2000);
+    }, 800);
   });
 });
 
@@ -3521,6 +3572,7 @@ function showAdminSection(sec, el) {
   if (sec === "cardapio")    renderAdminProducts();
   if (sec === "estoque")     renderStockAdmin();
   if (sec === "fiado")       renderFiadoAdmin();
+  if (sec === "historico")   loadHistoricoAdmin();
   if (sec === "suprimentos") renderIngredients();
   if (sec === "ia")          renderIASection();
   if (sec === "indicadores") loadIndicadores("mes");
@@ -4096,7 +4148,7 @@ function confirmarIdentificacao() {
   const savedClient = JSON.parse(localStorage.getItem("panillo-cliente") || "{}");
   const fiadoCard = document.getElementById("pay-fiado-card");
   if (fiadoCard && savedClient.wpp) {
-    const hasCredit = allFiadoAccounts.some(a => a.clientWpp === savedClient.wpp && a.autorizado);
+    const hasCredit = allFiadoAccounts.some(a => (a.clientWpp||"").replace(/\D/g,"") === (savedClient.wpp||"").replace(/\D/g,"") && a.autorizado);
     fiadoCard.style.display = hasCredit ? "" : "none";
   }
 
@@ -4122,7 +4174,7 @@ async function goStep(n) {
     localStorage.setItem("panillo-cliente", JSON.stringify(client));
     const fiadoCard = document.getElementById("pay-fiado-card");
     if (fiadoCard) {
-      const hasCredit = allFiadoAccounts.some(a => a.clientWpp === wpp && a.autorizado);
+      const hasCredit = allFiadoAccounts.some(a => (a.clientWpp||"").replace(/\D/g,"") === (wpp||"").replace(/\D/g,"") && a.autorizado);
       fiadoCard.style.display = hasCredit ? "" : "none";
     }
     renderOrderSummary("order-summary-2");
@@ -4156,6 +4208,7 @@ async function submitOrder() {
 
   const order = {
     numero: orderNum,
+    orderNum,
     cliente: client,
     itens: items.map(i => ({
       prodId: i.prod.id, nome: i.prod.nome, qty: i.qty, preco: i.prod.preco,
@@ -4174,6 +4227,7 @@ async function submitOrder() {
   };
   try {
     await fbAdd("orders", order);
+    addAuditLog(orderNum, `Novo pedido #${orderNum} — ${client.nome||"cliente"} — R$ ${total.toFixed(2)} — ${payLabel(selectedPay)}`, "pedido");
     await saveClientToFirebase(client, order);
     // ─── Notificações ───────────────────────────
     sendOrderNotifications(order).catch(e => console.warn("Notify error:", e));
@@ -4258,6 +4312,7 @@ async function saveClientToFirebase(client, order) {
         createdAt:  FB.serverTimestamp()
       });
       console.log("Novo cliente cadastrado:", client.nome);
+      addAuditLog(wppNorm, `Novo cliente cadastrado — ${client.nome} (${wppNorm})`, "cliente");
     } else {
       // Cliente existente — atualiza contadores e favorito
       const cDoc = existingDocs.docs[0];
@@ -4265,10 +4320,16 @@ async function saveClientToFirebase(client, order) {
       const novosPedidos   = (data.pedidos    || 0) + 1;
       const novoTotalGasto = (data.totalGasto || 0) + (Number(order.total) || 0);
 
-      // Recalcula favorito: conta qual produto aparece mais no histórico
-      // Para simplificar, usa o produto atual como favorito se for o primeiro pedido
-      const favoritoAtual = data.favorito || "";
-      const favoritoFinal = favoritoAtual || novoFavorito;
+      // Recalcula favorito: conta todos os pedidos do cliente e pega o produto mais frequente
+      // Busca pedidos anteriores para cruzar com o atual
+      const clientOrdersAll = (allOrders || []).filter(o =>
+        (o.cliente?.wpp || "").replace(/\D/g,"") === wppNorm && o.status !== "cancelado"
+      );
+      const prodCount = {};
+      [...clientOrdersAll, order].forEach(o =>
+        (o.itens||[]).forEach(i => { prodCount[i.nome] = (prodCount[i.nome]||0) + (i.qty||1); })
+      );
+      const favoritoFinal = Object.entries(prodCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || novoFavorito;
 
       await FB.updateDoc(cDoc.ref, {
         pedidos:    novosPedidos,
@@ -4282,6 +4343,7 @@ async function saveClientToFirebase(client, order) {
         wpp: wppNorm || client.wpp
       });
       console.log("Cliente atualizado:", client.nome);
+      addAuditLog(wppNorm, `Pedido registrado para ${client.nome} — total R$ ${Number(order.total).toFixed(2)} — pedidos: ${novosPedidos}`, "cliente");
     }
   } catch(e) {
     console.error("Erro ao salvar cliente no Firebase:", e);
@@ -4311,8 +4373,14 @@ function selectPay(type, el) {
   el.classList.add("selected");
   document.getElementById("pix-details").classList.add("hidden");
   document.getElementById("card-details").classList.add("hidden");
-  if (type === "pix") document.getElementById("pix-details").classList.remove("hidden");
-  else                 document.getElementById("card-details").classList.remove("hidden");
+  if (type === "pix") {
+    // Atualiza chave Pix dinamicamente
+    const pixEl = document.getElementById("checkout-pix-key-display");
+    if (pixEl) pixEl.textContent = PIX_KEY || "—";
+    document.getElementById("pix-details").classList.remove("hidden");
+  } else {
+    document.getElementById("card-details").classList.remove("hidden");
+  }
 }
 
 // ─── ADMIN: ORDERS ─────────────────────────────────────
@@ -4472,11 +4540,11 @@ async function applyOrderDiscount(orderId) {
       : o);
     showToast("Desconto de R$ " + descReais.toFixed(2).replace(".",",") + " aplicado!");
     renderOrders();
-    addAuditLog(orderId, "Desconto admin: -R$ " + descReais.toFixed(2) + " (" + (tipo === "pct" ? val + "%" : "fixo") + ")");
+    addAuditLog(orderId, "Desconto admin: -R$ " + descReais.toFixed(2) + " (" + (tipo === "pct" ? val + "%" : "fixo") + ")", "desconto");
   } catch(e) { showToast("Erro ao salvar desconto"); console.error(e); }
 }
 
-function payLabel(p) { return { pix:"Pix", credito:"Crédito", debito:"Débito", fiado:"Fiado" }[p] || p || "—"; }
+function payLabel(p) { return { pix:"Pix", credito:"Crédito", debito:"Débito", dinheiro:"Dinheiro", fiado:"Fiado" }[p] || p || "—"; }
 function statusLabel(s) { return { pendente:"pendente", confirmado:"confirmado", pronto:"pronto", entregue:"entregue", cancelado:"cancelado" }[s] || s || "pendente"; }
 function statusClass(s) { return { pendente:"s-pending", confirmado:"s-confirmed", pronto:"s-ready", entregue:"s-done", cancelado:"s-cancelled" }[s] || "s-pending"; }
 
@@ -4484,7 +4552,7 @@ async function togglePayConfirm(id, confirmed) {
   try { await fbUpdate("orders", id, { pagamentoConfirmado: confirmed }); } catch(e) { console.warn(e); }
   allOrders = allOrders.map(o => o.id === id ? { ...o, pagamentoConfirmado: confirmed } : o);
   renderOrders();
-  addAuditLog(id, confirmed ? "Pagamento confirmado" : "Confirmação de pagamento removida");
+  addAuditLog(id, confirmed ? "Pagamento confirmado" : "Confirmação de pagamento removida", "pagamento");
 }
 
 async function updateOrderPayMethod(id, newPay) {
@@ -4493,7 +4561,7 @@ async function updateOrderPayMethod(id, newPay) {
   const oldPay = order.pagamento;
   try { await fbUpdate("orders", id, { pagamento: newPay }); } catch(e) { console.warn(e); return; }
   allOrders = allOrders.map(o => o.id === id ? { ...o, pagamento: newPay } : o);
-  addAuditLog(id, `Forma de pagamento alterada: ${oldPay} → ${newPay}`);
+  addAuditLog(id, `Forma de pagamento alterada: ${payLabel(oldPay)} → ${payLabel(newPay)}`, "pagamento");
   // If changing to fiado: auto-link to client's fiado account
   if (newPay === "fiado" && order.cliente?.wpp) {
     const wpp = order.cliente.wpp.replace(/\D/g,"");
@@ -4544,12 +4612,151 @@ function exportOrdersCSV() {
   a.click(); URL.revokeObjectURL(url);
 }
 
-// ─── AUDIT LOG ─────────────────────────────────────────
-const auditLog = [];
-function addAuditLog(orderId, msg) {
-  const now = new Date().toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
-  auditLog.unshift({ orderId, msg, time: now });
-  if (auditLog.length > 100) auditLog.pop();
+// ─── HISTÓRICO DO SISTEMA (persistente no Firestore) ──────────────────────
+const auditLog = []; // mantido em memória para compatibilidade com código existente
+
+// Registra evento no Firestore e no array local
+async function addAuditLog(refId, msg, tipo) {
+  const now = new Date();
+  const entry = {
+    refId:  refId  || "",
+    msg:    msg    || "",
+    tipo:   tipo   || _inferTipo(msg),
+    data:   now.toLocaleDateString("pt-BR"),
+    hora:   now.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }),
+    ts:     now.toISOString()
+  };
+  auditLog.unshift(entry);
+  if (auditLog.length > 500) auditLog.pop();
+  // Persiste no Firestore em background (sem bloquear UI)
+  try {
+    if (db && FB) {
+      FB.addDoc(FB.collection(db, "historico"), { ...entry, createdAt: FB.serverTimestamp() })
+        .catch(e => console.warn("historico save:", e));
+    }
+  } catch(e) {}
+}
+
+function _inferTipo(msg) {
+  if (!msg) return "sistema";
+  const m = msg.toLowerCase();
+  if (m.includes("pagamento")) return "pagamento";
+  if (m.includes("desconto"))  return "desconto";
+  if (m.includes("fiado"))     return "fiado";
+  if (m.includes("estoque"))   return "estoque";
+  if (m.includes("cliente"))   return "cliente";
+  if (m.includes("status") || m.includes("→") || m.includes("pendente") || m.includes("entregue") || m.includes("cancelado")) return "status";
+  if (m.includes("pedido"))    return "pedido";
+  return "sistema";
+}
+
+let _histPage = 1;
+const HIST_PER_PAGE = 30;
+let _histDocs = [];
+
+async function loadHistoricoAdmin() {
+  try {
+    const snap = await FB.getDocs(
+      FB.query(FB.collection(db, "historico"), FB.orderBy("createdAt", "desc"))
+    );
+    _histDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Funde com auditLog em memória (eventos desta sessão ainda não persistidos)
+    auditLog.forEach(e => {
+      if (!_histDocs.some(d => d.ts === e.ts && d.msg === e.msg)) {
+        _histDocs.unshift(e);
+      }
+    });
+  } catch {
+    // Firestore indisponível — usa apenas memória
+    _histDocs = [...auditLog];
+  }
+  renderHistoricoAdmin();
+}
+
+const HIST_TIPO_LABEL = {
+  pedido:"🛒 Pedido", pagamento:"💰 Pagamento", status:"🔄 Status",
+  fiado:"🤝 Fiado", estoque:"📦 Estoque", desconto:"🏷️ Desconto",
+  cliente:"👤 Cliente", sistema:"⚙️ Sistema"
+};
+const HIST_TIPO_COLOR = {
+  pedido:"#0F4A4A", pagamento:"#27ae60", status:"#8e44ad",
+  fiado:"#2980b9", estoque:"#e67e22", desconto:"#16a085",
+  cliente:"#c0392b", sistema:"#7f8c8d"
+};
+
+function renderHistoricoAdmin() {
+  const list = document.getElementById("hist-list");
+  const pgEl  = document.getElementById("hist-pagination");
+  if (!list) return;
+
+  const filtroTipo = document.getElementById("hist-filter-tipo")?.value || "todos";
+  let docs = filtroTipo === "todos" ? _histDocs : _histDocs.filter(d => d.tipo === filtroTipo);
+
+  // KPIs
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const semanaAgo = new Date(Date.now() - 7*24*60*60*1000);
+  const countEl = document.getElementById("hist-total-count");
+  const todayEl = document.getElementById("hist-today-count");
+  const weekEl  = document.getElementById("hist-week-count");
+  if (countEl) countEl.textContent = _histDocs.length;
+  if (todayEl) todayEl.textContent = _histDocs.filter(d => d.data === hoje).length;
+  if (weekEl)  weekEl.textContent  = _histDocs.filter(d => new Date(d.ts||0) >= semanaAgo).length;
+
+  if (docs.length === 0) {
+    list.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:24px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">📋</div>Nenhum evento registrado ainda.</div>`;
+    if (pgEl) pgEl.innerHTML = "";
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(docs.length / HIST_PER_PAGE));
+  if (_histPage > totalPages) _histPage = totalPages;
+  const page = docs.slice((_histPage-1)*HIST_PER_PAGE, _histPage*HIST_PER_PAGE);
+
+  list.innerHTML = page.map(d => {
+    const tipo    = d.tipo || "sistema";
+    const cor     = HIST_TIPO_COLOR[tipo] || "#7f8c8d";
+    const tipoLabel = HIST_TIPO_LABEL[tipo] || tipo;
+    return `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:#fff;border:1px solid var(--border-light);border-radius:10px;border-left:3px solid ${cor};">
+      <div style="flex-shrink:0;margin-top:2px;">
+        <span style="font-size:10px;font-weight:700;background:${cor}20;color:${cor};padding:2px 7px;border-radius:20px;white-space:nowrap;">${tipoLabel}</span>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;color:var(--text);">${d.msg || "—"}</div>
+        ${d.refId ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">Ref: ${d.refId}</div>` : ""}
+      </div>
+      <div style="flex-shrink:0;text-align:right;">
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;">${d.data || ""}</div>
+        <div style="font-size:11px;color:var(--muted);">${d.hora || ""}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // Pagination
+  if (pgEl) {
+    let html = `<span style="font-size:12px;color:var(--muted);margin-right:4px;">${docs.length} evento(s)</span>`;
+    html += `<button class="pg-btn ${_histPage===1?'disabled':''}" onclick="_histPage--;renderHistoricoAdmin()">‹</button>`;
+    for (let p=1;p<=totalPages;p++) {
+      if (totalPages<=7||Math.abs(p-_histPage)<=2||p===1||p===totalPages) {
+        html += `<button class="pg-btn ${p===_histPage?'active':''}" onclick="_histPage=${p};renderHistoricoAdmin()">${p}</button>`;
+      } else if (Math.abs(p-_histPage)===3) {
+        html += `<span style="color:var(--muted);padding:0 4px;">…</span>`;
+      }
+    }
+    html += `<button class="pg-btn ${_histPage===totalPages?'disabled':''}" onclick="_histPage++;renderHistoricoAdmin()">›</button>`;
+    pgEl.innerHTML = html;
+  }
+}
+
+function exportHistoricoCSV() {
+  const headers = ["Data","Hora","Tipo","Mensagem","Referência"];
+  const rows = _histDocs.map(d => [d.data||"", d.hora||"", d.tipo||"", d.msg||"", d.refId||""]);
+  const csv = [headers,...rows].map(r => r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href=url; a.download=`historico_panillo_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
 }
 
 async function updateOrderStatus(id, newStatus) {
@@ -4567,7 +4774,7 @@ async function updateOrderStatus(id, newStatus) {
   const badge = allOrders.filter(o => o.status === "pendente").length;
   document.getElementById("badge-pedidos").textContent = badge;
   updateMbnBadge(badge);
-  addAuditLog(id, `${prevStatus} → ${newStatus}`);
+  addAuditLog(id, `Status: ${statusLabel(prevStatus)} → ${statusLabel(newStatus)} (${order?.cliente?.nome||"cliente"})`, "status");
 
   // ── Baixa estoque PE ao entregar ──────────────────────────────
   if (newStatus === "entregue" && prevStatus !== "entregue" &&
@@ -4938,6 +5145,7 @@ async function saveStockQty(prodId) {
       allStock[prodId] = { ...s, id: docs.docs[0].id, qty };
     }
     showToast("Estoque salvo!");
+    addAuditLog(prodId, `Estoque atualizado — ${allProducts.find(p=>p.id===prodId)?.nome||prodId}: ${qty} unid.`, "estoque");
     renderPEProducts();
   } catch(e) { showToast("Erro ao salvar estoque"); console.error(e); }
 }
@@ -5096,7 +5304,13 @@ async function renderFiadoAdmin() {
                 </select>
               </div>
               <label style="font-size:12px;">Forma de pagamento</label>
-              <input class="fi" type="text" id="fopmet-${a.id}-${o.id}" placeholder="Ex: Pix, dinheiro, cartão..." style="margin-bottom:8px;">
+              <select class="fi" id="fopmet-${a.id}-${o.id}" style="margin-bottom:8px;">
+                <option value="pix">Pix</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="credito">Cartão Crédito</option>
+                <option value="debito">Cartão Débito</option>
+                <option value="transferencia">Transferência</option>
+              </select>
               <button class="btn-sm-primary" style="width:100%;padding:10px;" onclick="registerFiadoOrderPayment('${a.id}','${o.id}',${oTotal},${saldo})">
                 Confirmar pagamento deste pedido
               </button>
@@ -5177,7 +5391,13 @@ async function renderFiadoAdmin() {
             </select>
           </div>
           <label>Forma de pagamento</label>
-          <input class="fi" type="text" id="fpmet-${a.id}" placeholder="Ex: Pix, dinheiro, cartão...">
+          <select class="fi" id="fpmet-${a.id}" style="margin-bottom:10px;">
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="credito">Cartão Crédito</option>
+            <option value="debito">Cartão Débito</option>
+            <option value="transferencia">Transferência</option>
+          </select>
           <label>Observação (opcional)</label>
           <input class="fi" type="text" id="fpobs-${a.id}" placeholder="Ex: referente a maio">
           <div style="margin-top:12px;">
@@ -5253,7 +5473,7 @@ async function registerFiadoOrderPayment(accountId, orderId, orderTotal, current
     const entries = [];
     entries.push({
       tipo: "pagamento",
-      descricao: `Pagamento de ${orderRef}` + (metInput?.value ? " — " + metInput.value : ""),
+      descricao: `Pagamento de ${orderRef}` + (metInput?.value ? " — " + payLabel(metInput.value) : ""),
       valor: val,
       data: dateStr
     });
@@ -5279,6 +5499,7 @@ async function registerFiadoOrderPayment(accountId, orderId, orderTotal, current
     let msg = `Pagamento de R$ ${val.toFixed(2).replace(".",",")} registrado!`;
     if (descReais > 0) msg += ` + desconto R$ ${descReais.toFixed(2).replace(".",",")}`;
     showToast(msg);
+    addAuditLog(accountId, `Fiado — pagamento de R$ ${val.toFixed(2)} (${payLabel(metInput?.value)}) ref. ${orderRef} — cliente: ${account.clientNome}`, "fiado");
     renderFiadoAdmin();
   } catch(e) { showToast("Erro ao registrar pagamento"); console.error(e); }
 }
@@ -5314,7 +5535,7 @@ async function registerFiadoPayment(accountId, currentSaldo) {
     const entries = [];
     entries.push({
       tipo: "pagamento",
-      descricao: "Pagamento recebido" + (metInput?.value ? " — " + metInput.value : "") + (obsInput?.value ? " (" + obsInput.value + ")" : ""),
+      descricao: "Pagamento recebido" + (metInput?.value ? " — " + payLabel(metInput.value) : "") + (obsInput?.value ? " (" + obsInput.value + ")" : ""),
       valor: val,
       data: dateStr
     });
@@ -5334,6 +5555,7 @@ async function registerFiadoPayment(accountId, currentSaldo) {
     let msg = "Pagamento de R$ " + val.toFixed(2).replace(".",",") + " registrado!";
     if (descReais > 0) msg += " + desconto de R$ " + descReais.toFixed(2).replace(".",",");
     showToast(msg);
+    addAuditLog(accountId, `Fiado — pagamento total R$ ${val.toFixed(2)} (${payLabel(metInput?.value)}) — cliente: ${account.clientNome}`, "fiado");
     renderFiadoAdmin();
   } catch(e) { showToast("Erro ao registrar pagamento"); console.error(e); }
 }
@@ -5344,24 +5566,28 @@ async function revokeCredit(accountId, clientName) {
     await fbUpdate("fiadoAccounts", accountId, { autorizado: false });
     allFiadoAccounts = allFiadoAccounts.map(a => a.id === accountId ? { ...a, autorizado: false } : a);
     showToast("Crédito revogado.");
+    addAuditLog(accountId, `Crédito fiado revogado — cliente: ${clientName}`, "fiado");
     renderFiadoAdmin();
   } catch(e) { showToast("Erro ao revogar crédito"); }
 }
 
 async function addFiadoDebt(client, order) {
   try {
-    const account = allFiadoAccounts.find(a => a.clientWpp === client.wpp && a.autorizado);
+    const wppNorm = (client.wpp || "").replace(/\D/g, "");
+    const account = allFiadoAccounts.find(a => (a.clientWpp||"").replace(/\D/g,"") === wppNorm && a.autorizado);
     if (!account) return;
+    const numRef = order.orderNum || order.numero || order.id?.substring(0,6);
     const now = new Date();
     const newHist = [...(account.historico || []), {
       tipo: "pedido",
-      descricao: `Pedido #${order.numero} — ${(order.itens||[]).map(i=>`${i.qty}× ${i.nome}`).join(", ")}`,
+      descricao: `Pedido #${numRef} — ${(order.itens||[]).map(i=>`${i.qty}× ${i.nome}`).join(", ")}`,
       valor: order.total,
       data: now.toLocaleDateString("pt-BR")
     }];
     const newSaldo = (account.saldo || 0) + order.total;
     await fbUpdate("fiadoAccounts", account.id, { saldo: newSaldo, historico: newHist });
     allFiadoAccounts = allFiadoAccounts.map(a => a.id === account.id ? { ...a, saldo: newSaldo, historico: newHist } : a);
+    addAuditLog(account.id, `Débito fiado — R$ ${order.total.toFixed(2)} — pedido #${numRef} — ${account.clientNome}`, "fiado");
     const badge = document.getElementById("badge-fiado");
     if (badge) badge.textContent = allFiadoAccounts.filter(a=>a.autorizado).length;
   } catch(e) { console.warn("Fiado debt error", e); }
@@ -5442,9 +5668,11 @@ async function confirmFiadoAuth() {
   if (!foundFiadoClient) { showToast("Busque um cliente primeiro!"); return; }
   const limite = parseFloat(document.getElementById("fiado-limite").value) || null;
   const obs    = document.getElementById("fiado-obs").value.trim();
+  // Normaliza wpp para só dígitos — evita inconsistências de formato
+  const wppNorm = (foundFiadoClient.wpp || "").replace(/\D/g, "");
 
-  // Check if already has an account
-  const existing = allFiadoAccounts.find(a => a.clientWpp === foundFiadoClient.wpp);
+  // Check if already has an account (compara normalizado)
+  const existing = allFiadoAccounts.find(a => (a.clientWpp||"").replace(/\D/g,"") === wppNorm);
   try {
     if (existing) {
       await fbUpdate("fiadoAccounts", existing.id, { autorizado: true, ...(limite?{limite}:{}), ...(obs?{obs}:{}) });
@@ -5453,7 +5681,7 @@ async function confirmFiadoAuth() {
       const data = {
         clientId:   foundFiadoClient.id,
         clientNome: foundFiadoClient.nome,
-        clientWpp:  foundFiadoClient.wpp,
+        clientWpp:  wppNorm,
         saldo:      0,
         autorizado: true,
         historico:  [],
@@ -5464,6 +5692,7 @@ async function confirmFiadoAuth() {
       allFiadoAccounts.push({ id: ref.id, ...data });
     }
     showToast(`Fiado autorizado para ${foundFiadoClient.nome}!`);
+    addAuditLog(wppNorm, `Fiado autorizado para ${foundFiadoClient.nome}${limite ? ` — limite R$ ${limite.toFixed(2)}` : ""}`, "fiado");
     closeFiadoAuthModal();
     renderFiadoAdmin();
     const badge = document.getElementById("badge-fiado");
@@ -7516,7 +7745,7 @@ function buildReceipt(order, orderNum) {
     <div style="margin-top:12px;padding-top:10px;border-top:0.5px solid var(--border);font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px;">
       <div>📅 Retirada: <strong>${new Date(order.dataRetirada+"T12:00").toLocaleDateString("pt-BR")}</strong> ${order.periodo ? "· "+order.periodo : ""}</div>
       <div>📍 Local: <strong>${addr}</strong></div>
-      <div>💳 Pagamento: <strong>${{pix:"Pix",credito:"Cartão de crédito",debito:"Cartão de débito"}[order.pagamento] || order.pagamento}</strong></div>
+      <div>💳 Pagamento: <strong>${{pix:"Pix",credito:"Cartão de crédito",debito:"Cartão de débito",dinheiro:"Dinheiro",fiado:"Fiado"}[order.pagamento] || order.pagamento}</strong></div>
     </div>`;
 
   // Pix box
@@ -8103,6 +8332,7 @@ async function submitVendaPresencial() {
       await fbUpdate("clients", _vpClient.id, { pedidos, totalGasto });
     }
     showToast("Venda registrada com sucesso!", "success");
+    addAuditLog(orderNum, `Venda presencial #${orderNum} — ${order.cliente.nome} — R$ ${total.toFixed(2)} — ${payLabel(pagamento)}`, "pedido");
     closeVendaPresencial();
     renderOrders();
   } catch(e) {
