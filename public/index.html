@@ -2162,7 +2162,7 @@ img { max-width: 100%; display: block; }
 
       <div style="background:var(--cream);border-radius:10px;padding:12px;font-size:13px;color:var(--muted);margin-top:4px;">
         <i class="ti ti-calculator" style="color:var(--gold);"></i>
-        Custo calculado automaticamente com +15% de gastos invisíveis.
+        Custo calculado automaticamente com os custos invisíveis configurados.
         Custo estimado por unidade: <strong id="pm-custo-est" style="color:var(--teal-dark);">—</strong>
         · Margem: <strong id="pm-margem-est" style="color:#1A7A44;">—</strong>
       </div>
@@ -5901,7 +5901,9 @@ function recalcCost() {
       total += cost;
     } else { costEl.value = ""; }
   });
-  const withExtra = total * 1.15;
+  const _cfgLocal = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  const _overheadPct = (parseFloat(_cfgLocal.overhead) || 20) / 100;
+  const withExtra = total * (1 + _overheadPct);
   const rend = parseInt(document.getElementById("pm-rend").value) || 1;
   const preco = parseFloat(document.getElementById("pm-preco").value) || 0;
   const costPerUnit = withExtra / rend;
@@ -6055,7 +6057,9 @@ function renderRecipes() {
       totalCost += cost;
       return `<div class="rc-row"><span class="rc-ing">${ing.nome}</span><span class="rc-gram">${pi.grams}g</span><span class="rc-cost">R$ ${cost.toFixed(2)}</span></div>`;
     }).join("");
-    const withExtra = totalCost * 1.15;
+    const _cfgLocal2 = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+    const _overheadPct2 = (parseFloat(_cfgLocal2.overhead) || 20) / 100;
+    const withExtra = totalCost * (1 + _overheadPct2);
     const rend = p.rendimento || 1;
     const perUnit = withExtra / rend;
     const margem = p.preco > 0 ? ((p.preco - perUnit)/p.preco*100) : 0;
@@ -6064,7 +6068,7 @@ function renderRecipes() {
       <div class="rc-body">${rows || '<div style="padding:8px;color:var(--muted);font-size:12px;">Sem ingredientes</div>'}</div>
       <div class="rc-footer">
         <div class="rc-f-row"><span class="rc-f-lbl">Ingredientes</span><span class="rc-f-val">R$ ${totalCost.toFixed(2)}</span></div>
-        <div class="rc-f-row"><span class="rc-f-lbl">+ 15% invisíveis</span><span class="rc-f-val">R$ ${(totalCost*0.15).toFixed(2)}</span></div>
+        <div class="rc-f-row"><span class="rc-f-lbl">+ ${Math.round(_overheadPct2*100)}% invisíveis</span><span class="rc-f-val">R$ ${(totalCost*_overheadPct2).toFixed(2)}</span></div>
         <div class="rc-f-row"><span class="rc-f-lbl">Custo total (${rend} un.)</span><span class="rc-f-val">R$ ${withExtra.toFixed(2)}</span></div>
         <div class="rc-f-row"><span class="rc-f-lbl">Custo por unidade</span><span class="rc-f-val">R$ ${perUnit.toFixed(2)}</span></div>
         <div class="rc-profit-row">
