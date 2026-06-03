@@ -3714,9 +3714,13 @@ function renderPEProducts() {
         ? "background:linear-gradient(135deg,#FDF6E8,#F5E0B0);"
         : "background:linear-gradient(135deg,#FDF0DC,#F5E0B0);";
     const cardOp = qty === 0 ? "opacity:0.55;" : "";
+    const imgContent = p.fotoUrl
+      ? `<img src="${p.fotoUrl}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;object-position:${p.fotoPos?p.fotoPos.x+'% '+p.fotoPos.y+'%':'50% 50%'};transform:scale(${p.fotoPos?p.fotoPos.zoom/100:1});transform-origin:${p.fotoPos?p.fotoPos.x+'% '+p.fotoPos.y+'%':'50% 50%'};" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+        + `<span style="display:none;font-size:72px;align-items:center;justify-content:center;width:100%;height:100%;">${p.emoji||"🍪"}</span>`
+      : `<span style="font-size:72px;">${p.emoji || "🍪"}</span>`;
     return `<div class="product-card" style="${cardOp}" id="pe-card-${p.id}">
-      <div class="prod-img ${p.categoria}" style="${imgBg}">
-        <span style="font-size:72px;">${p.emoji || "🍪"}</span>
+      <div class="prod-img ${p.categoria}" style="${imgBg}position:relative;overflow:hidden;">
+        ${imgContent}
       </div>
       <div class="prod-body">
         <div class="prod-name">${p.nome}</div>
@@ -4921,23 +4925,6 @@ async function updateOrderStatus(id, newStatus) {
     if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
   }
 
-  // ── Reverte fiado se pedido fiado for cancelado ───────────────
-  if (newStatus === "cancelado" && order?.pagamento === "fiado" && prevStatus !== "cancelado") {
-    const wpp = order?.cliente?.wpp?.replace(/\D/g,"");
-    if (wpp) {
-      try {
-        const accounts = await fbGet("fiadoAccounts");
-        const acc = accounts.find(a => a.clientWpp?.replace(/\D/g,"") === wpp);
-        if (acc) {
-          const novoSaldo = Math.max(0, Number(acc.saldo||0) - Number(order.total||0));
-          await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo });
-          allFiadoAccounts = allFiadoAccounts.map(a => a.id === acc.id ? { ...a, saldo: novoSaldo } : a);
-          addAuditLog(id, `Fiado revertido — pedido cancelado #${order.orderNum||id} — -R$ ${Number(order.total||0).toFixed(2)} — ${order.cliente?.nome||""}`, "fiado");
-        }
-      } catch(e) { console.warn("Erro ao reverter fiado:", e); }
-    }
-  }
-
   // ── Devolve estoque PE se cancelado ──────────────────────────
   // Restaura se: (a) flag _stockDecremented está true, OU
   //              (b) status anterior era "entregue" (estoque já foi baixado)
@@ -5315,47 +5302,8 @@ async function loadFiadoAccounts() {
   if (badgeEl) badgeEl.textContent = activeCount;
 }
 
-// ── Reconcilia saldos do fiado com base nos pedidos reais ────────────────────
-// Recalcula o saldo de cada conta somando apenas pedidos fiado não cancelados
-// e não totalmente pagos. Corrige inconsistências históricas (ex: pedido
-// cancelado após já ter sido somado ao saldo).
-async function reconcileFiadoSaldos() {
-  if (!allFiadoAccounts.length || !allOrders.length) return;
-  let changed = false;
-  for (const acc of allFiadoAccounts) {
-    if (!acc.autorizado) continue;
-    const wpp = (acc.clientWpp || "").replace(/\D/g, "");
-    if (!wpp) continue;
-    // Soma apenas pedidos fiado ativos (não cancelados, não pagos)
-    const pedidosAtivos = allOrders.filter(o =>
-      o.pagamento === "fiado" &&
-      o.status !== "cancelado" &&
-      !o.pagamentoConfirmado &&
-      (o.cliente?.wpp || "").replace(/\D/g, "") === wpp
-    );
-    const saldoReal = pedidosAtivos.reduce((s, o) => s + Number(o.total || 0), 0);
-    const saldoAtual = Number(acc.saldo || 0);
-    // Só corrige se houver diferença relevante (>= R$ 0,01)
-    if (Math.abs(saldoReal - saldoAtual) >= 0.01) {
-      try {
-        await fbUpdate("fiadoAccounts", acc.id, { saldo: saldoReal });
-        allFiadoAccounts = allFiadoAccounts.map(a =>
-          a.id === acc.id ? { ...a, saldo: saldoReal } : a
-        );
-        console.log(`[reconcileFiado] ${acc.clientNome}: R$ ${saldoAtual.toFixed(2)} → R$ ${saldoReal.toFixed(2)}`);
-        changed = true;
-      } catch(e) { console.warn("[reconcileFiado] Erro ao corrigir saldo:", e); }
-    }
-  }
-  return changed;
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 async function renderFiadoAdmin() {
   await loadFiadoAccounts();
-  // Garante que allOrders está carregado para o reconcile poder cruzar os dados
-  if (!allOrders.length) { try { allOrders = await fbGet("orders"); } catch {} }
-  await reconcileFiadoSaldos();
   const list = document.getElementById("fiado-client-list");
   if (!list) return;
 
@@ -7957,14 +7905,20 @@ function openComboModal(prodId) {
   const cookieSlots   = document.getElementById("combo-cookie-slots");
   cookieSection.style.display = nCookies > 0 ? "block" : "none";
   cookieSlots.innerHTML = "";
-  for (let i = 0; i < nCookies; i++) {
-    cookieSlots.innerHTML += `
-      <div class="fg" style="margin-bottom:8px;">
-        <label class="fl">Cookie ${i+1}</label>
-        <select class="fi" id="combo-cookie-${i}" style="padding:9px 12px;">
-          ${cookieProds.map(p => `<option value="${p.nome}">${p.nome}</option>`).join("")}
-        </select>
-      </div>`;
+  if (nCookies > 0 && cookieProds.length === 0) {
+    cookieSlots.innerHTML = `<div style="font-size:12px;color:#c0392b;background:#fdecea;border-radius:8px;padding:10px 12px;">
+      ⚠️ Nenhum cookie cadastrado. Cadastre produtos com a categoria "cookie" no painel admin.
+    </div>`;
+  } else {
+    for (let i = 0; i < nCookies; i++) {
+      cookieSlots.innerHTML += `
+        <div class="fg" style="margin-bottom:8px;">
+          <label class="fl">Cookie ${i+1}</label>
+          <select class="fi" id="combo-cookie-${i}" style="padding:9px 12px;">
+            ${cookieProds.map(p => `<option value="${p.nome}">${p.nome}</option>`).join("")}
+          </select>
+        </div>`;
+    }
   }
 
   // Brownie slots
@@ -7973,14 +7927,20 @@ function openComboModal(prodId) {
   const brownieSlots   = document.getElementById("combo-brownie-slots");
   brownieSection.style.display = nBrownies > 0 ? "block" : "none";
   brownieSlots.innerHTML = "";
-  for (let i = 0; i < nBrownies; i++) {
-    brownieSlots.innerHTML += `
-      <div class="fg" style="margin-bottom:8px;">
-        <label class="fl">Brownie ${i+1}</label>
-        <select class="fi" id="combo-brownie-${i}" style="padding:9px 12px;">
-          ${brownieProds.map(p => `<option value="${p.nome}">${p.nome}</option>`).join("")}
-        </select>
-      </div>`;
+  if (nBrownies > 0 && brownieProds.length === 0) {
+    brownieSlots.innerHTML = `<div style="font-size:12px;color:#c0392b;background:#fdecea;border-radius:8px;padding:10px 12px;">
+      ⚠️ Nenhum brownie cadastrado. Cadastre produtos com a categoria "brownie" no painel admin.
+    </div>`;
+  } else {
+    for (let i = 0; i < nBrownies; i++) {
+      brownieSlots.innerHTML += `
+        <div class="fg" style="margin-bottom:8px;">
+          <label class="fl">Brownie ${i+1}</label>
+          <select class="fi" id="combo-brownie-${i}" style="padding:9px 12px;">
+            ${brownieProds.map(p => `<option value="${p.nome}">${p.nome}</option>`).join("")}
+          </select>
+        </div>`;
+    }
   }
 
   document.getElementById("combo-obs").value = "";
@@ -7998,14 +7958,21 @@ function addComboToCart() {
   const nCookies  = parseInt(prod.comboCookies  || 0);
   const nBrownies = parseInt(prod.comboBrownies || 0);
 
+  if (nCookies === 0 && nBrownies === 0) {
+    showToast("Este combo não tem produtos configurados. Configure no painel admin.");
+    return;
+  }
+
   const sabores = [];
   for (let i = 0; i < nCookies; i++) {
     const sel = document.getElementById(`combo-cookie-${i}`);
-    if (sel) sabores.push(sel.value);
+    if (!sel || !sel.value) { showToast("Escolha todos os sabores de cookie!"); return; }
+    sabores.push(sel.value);
   }
   for (let i = 0; i < nBrownies; i++) {
     const sel = document.getElementById(`combo-brownie-${i}`);
-    if (sel) sabores.push(sel.value);
+    if (!sel || !sel.value) { showToast("Escolha todos os sabores de brownie!"); return; }
+    sabores.push(sel.value);
   }
   const obs = document.getElementById("combo-obs").value.trim();
 
@@ -8520,7 +8487,7 @@ async function submitVendaPresencial() {
     status: "entregue",
     cliente: _vpClient ? { nome: _vpClient.nome, wpp: _vpClient.wpp } : { nome: "Venda Presencial", wpp: "" },
     clienteId: _vpClient?.id || null,
-    itens: items.map(i => ({ nome: i.nome, qty: i.qty, preco: i.preco, prodId: i.prodId })),
+    itens: items.map(i => ({ nome: i.nome, qty: i.qty, preco: i.preco })),
     subtotal,
     desconto: descontoValor,
     descontoTipo: window._vpDescontoTipo || "R$",
@@ -8539,29 +8506,6 @@ async function submitVendaPresencial() {
     const ref = await fbAdd("orders", order);
     order.id = ref;
     allOrders.unshift(order);
-
-    // ── Baixa estoque imediatamente na venda presencial ──────────
-    let stockChangedVP = false;
-    for (const item of items) {
-      if (!item.prodId) continue;
-      const s = allStock[item.prodId] || {};
-      const newQty = Math.max(0, (s.qty || 0) - (item.qty || 0));
-      allStock[item.prodId] = { ...s, qty: newQty };
-      try {
-        const stockDocs = await FB.getDocs(
-          FB.query(FB.collection(db, "stock"), FB.where("prodId", "==", item.prodId))
-        );
-        if (!stockDocs.empty) {
-          await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
-          stockChangedVP = true;
-        }
-      } catch(e) { console.warn("Erro ao baixar estoque VP:", e); }
-    }
-    try { await fbUpdate("orders", ref, { _stockDecremented: true }); } catch(e) {}
-    allOrders = allOrders.map(o => o.id === ref ? { ...o, _stockDecremented: true } : o);
-    if (stockChangedVP) { renderStockAdmin(); renderPEProducts(); }
-    // ─────────────────────────────────────────────────────────────
-
     // If fiado: link to client's account
     if (pagamento === "fiado" && _vpClient?.wpp) {
       let accounts = [];
