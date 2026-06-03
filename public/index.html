@@ -2162,7 +2162,7 @@ img { max-width: 100%; display: block; }
 
       <div style="background:var(--cream);border-radius:10px;padding:12px;font-size:13px;color:var(--muted);margin-top:4px;">
         <i class="ti ti-calculator" style="color:var(--gold);"></i>
-        Custo calculado automaticamente com os custos invisíveis configurados.
+        Custo calculado automaticamente com +15% de gastos invisíveis.
         Custo estimado por unidade: <strong id="pm-custo-est" style="color:var(--teal-dark);">—</strong>
         · Margem: <strong id="pm-margem-est" style="color:#1A7A44;">—</strong>
       </div>
@@ -2560,15 +2560,37 @@ img { max-width: 100%; display: block; }
             <option value="fiado">Fiado</option>
           </select>
         </div>
+        <!-- Desconto -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;">Desconto (opcional)</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div style="display:flex;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;">
+              <button id="vp-desc-tipo-R" onclick="vpSetDescontoTipo('R$')" style="padding:9px 14px;border:none;background:var(--teal);color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s;">R$</button>
+              <button id="vp-desc-tipo-P" onclick="vpSetDescontoTipo('%')" style="padding:9px 14px;border:none;background:#fff;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:background .15s;">%</button>
+            </div>
+            <input id="vp-desconto" type="number" min="0" step="0.01" placeholder="0,00" oninput="vpCalcTotal()"
+              style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;color:var(--text);background:#fff;">
+          </div>
+        </div>
         <!-- Obs -->
         <div style="margin-bottom:20px;">
           <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;">Observação (opcional)</label>
           <textarea id="vp-obs" rows="2" placeholder="Anotações..." style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;color:var(--text);background:#fff;box-sizing:border-box;resize:none;"></textarea>
         </div>
         <!-- Total -->
-        <div style="background:var(--cream);border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:13px;font-weight:600;color:var(--muted);">Total</span>
-          <span id="vp-total" style="font-size:20px;font-weight:700;color:var(--teal);">R$ 0,00</span>
+        <div style="background:var(--cream);border-radius:10px;padding:14px 16px;margin-bottom:20px;">
+          <div id="vp-subtotal-row" style="display:none;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:12px;color:var(--muted);">Subtotal</span>
+            <span id="vp-subtotal" style="font-size:13px;color:var(--muted);">R$ 0,00</span>
+          </div>
+          <div id="vp-desconto-row" style="display:none;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:12px;color:#c0392b;font-weight:600;">Desconto</span>
+            <span id="vp-desconto-valor" style="font-size:13px;color:#c0392b;font-weight:600;">– R$ 0,00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:var(--muted);">Total</span>
+            <span id="vp-total" style="font-size:20px;font-weight:700;color:var(--teal);">R$ 0,00</span>
+          </div>
         </div>
         <button onclick="submitVendaPresencial()" style="width:100%;background:var(--teal);color:#fff;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">Registrar Venda</button>
       </div>
@@ -5901,9 +5923,7 @@ function recalcCost() {
       total += cost;
     } else { costEl.value = ""; }
   });
-  const _cfgLocal = JSON.parse(localStorage.getItem("panillo-config") || "{}");
-  const _overheadPct = (parseFloat(_cfgLocal.overhead) || 20) / 100;
-  const withExtra = total * (1 + _overheadPct);
+  const withExtra = total * 1.15;
   const rend = parseInt(document.getElementById("pm-rend").value) || 1;
   const preco = parseFloat(document.getElementById("pm-preco").value) || 0;
   const costPerUnit = withExtra / rend;
@@ -6057,9 +6077,7 @@ function renderRecipes() {
       totalCost += cost;
       return `<div class="rc-row"><span class="rc-ing">${ing.nome}</span><span class="rc-gram">${pi.grams}g</span><span class="rc-cost">R$ ${cost.toFixed(2)}</span></div>`;
     }).join("");
-    const _cfgLocal2 = JSON.parse(localStorage.getItem("panillo-config") || "{}");
-    const _overheadPct2 = (parseFloat(_cfgLocal2.overhead) || 20) / 100;
-    const withExtra = totalCost * (1 + _overheadPct2);
+    const withExtra = totalCost * 1.15;
     const rend = p.rendimento || 1;
     const perUnit = withExtra / rend;
     const margem = p.preco > 0 ? ((p.preco - perUnit)/p.preco*100) : 0;
@@ -6068,7 +6086,7 @@ function renderRecipes() {
       <div class="rc-body">${rows || '<div style="padding:8px;color:var(--muted);font-size:12px;">Sem ingredientes</div>'}</div>
       <div class="rc-footer">
         <div class="rc-f-row"><span class="rc-f-lbl">Ingredientes</span><span class="rc-f-val">R$ ${totalCost.toFixed(2)}</span></div>
-        <div class="rc-f-row"><span class="rc-f-lbl">+ ${Math.round(_overheadPct2*100)}% invisíveis</span><span class="rc-f-val">R$ ${(totalCost*_overheadPct2).toFixed(2)}</span></div>
+        <div class="rc-f-row"><span class="rc-f-lbl">+ 15% invisíveis</span><span class="rc-f-val">R$ ${(totalCost*0.15).toFixed(2)}</span></div>
         <div class="rc-f-row"><span class="rc-f-lbl">Custo total (${rend} un.)</span><span class="rc-f-val">R$ ${withExtra.toFixed(2)}</span></div>
         <div class="rc-f-row"><span class="rc-f-lbl">Custo por unidade</span><span class="rc-f-val">R$ ${perUnit.toFixed(2)}</span></div>
         <div class="rc-profit-row">
@@ -8300,6 +8318,9 @@ async function openVendaPresencial() {
   document.getElementById("vp-client-selected").style.display = "none";
   document.getElementById("vp-obs").value = "";
   document.getElementById("vp-pagamento").value = "pix";
+  document.getElementById("vp-desconto").value = "";
+  window._vpDescontoTipo = "R$";
+  vpSetDescontoTipo("R$");
   vpRenderItems();
   vpAddItem();
   // Load clients
@@ -8381,17 +8402,52 @@ function vpRemoveItem(i) {
   vpRenderItems();
 }
 
+function vpSetDescontoTipo(tipo) {
+  window._vpDescontoTipo = tipo;
+  const btnR = document.getElementById("vp-desc-tipo-R");
+  const btnP = document.getElementById("vp-desc-tipo-P");
+  if (btnR && btnP) {
+    btnR.style.background = tipo === "R$" ? "var(--teal)" : "#fff";
+    btnR.style.color      = tipo === "R$" ? "#fff" : "var(--muted)";
+    btnP.style.background = tipo === "%" ? "var(--teal)" : "#fff";
+    btnP.style.color      = tipo === "%" ? "#fff" : "var(--muted)";
+  }
+  vpCalcTotal();
+}
+
 function vpCalcTotal() {
-  const total = _vpItems.reduce((s, item) => s + (item.preco * item.qty), 0);
-  const el = document.getElementById("vp-total");
-  if (el) el.textContent = "R$ " + total.toFixed(2).replace(".",",");
-  return total;
+  const subtotal = _vpItems.reduce((s, item) => s + (item.preco * item.qty), 0);
+  const descontoInput = parseFloat(document.getElementById("vp-desconto")?.value) || 0;
+  const tipo = window._vpDescontoTipo || "R$";
+  let descontoValor = tipo === "%" ? subtotal * (descontoInput / 100) : descontoInput;
+  descontoValor = Math.min(descontoValor, subtotal); // não pode ser maior que subtotal
+  const total = Math.max(0, subtotal - descontoValor);
+
+  // Subtotal row
+  const subtotalRow = document.getElementById("vp-subtotal-row");
+  const subtotalEl  = document.getElementById("vp-subtotal");
+  const descontoRow = document.getElementById("vp-desconto-row");
+  const descontoEl  = document.getElementById("vp-desconto-valor");
+  const totalEl     = document.getElementById("vp-total");
+
+  if (descontoValor > 0) {
+    if (subtotalRow) { subtotalRow.style.display = "flex"; }
+    if (subtotalEl)  subtotalEl.textContent = "R$ " + subtotal.toFixed(2).replace(".",",");
+    if (descontoRow) { descontoRow.style.display = "flex"; }
+    if (descontoEl)  descontoEl.textContent = "– R$ " + descontoValor.toFixed(2).replace(".",",");
+  } else {
+    if (subtotalRow) subtotalRow.style.display = "none";
+    if (descontoRow) descontoRow.style.display = "none";
+  }
+
+  if (totalEl) totalEl.textContent = "R$ " + total.toFixed(2).replace(".",",");
+  return { subtotal, descontoValor, total };
 }
 
 async function submitVendaPresencial() {
   const items = _vpItems.filter(i => i.prodId);
   if (!items.length) { showToast("Adicione ao menos um produto", "error"); return; }
-  const total = vpCalcTotal();
+  const { subtotal, descontoValor, total } = vpCalcTotal();
   const pagamento = document.getElementById("vp-pagamento").value;
   const obs = document.getElementById("vp-obs").value;
 
@@ -8403,6 +8459,9 @@ async function submitVendaPresencial() {
     cliente: _vpClient ? { nome: _vpClient.nome, wpp: _vpClient.wpp } : { nome: "Venda Presencial", wpp: "" },
     clienteId: _vpClient?.id || null,
     itens: items.map(i => ({ nome: i.nome, qty: i.qty, preco: i.preco })),
+    subtotal,
+    desconto: descontoValor,
+    descontoTipo: window._vpDescontoTipo || "R$",
     total,
     pagamento,
     pagamentoConfirmado: pagamento !== "fiado",
