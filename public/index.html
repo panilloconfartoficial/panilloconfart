@@ -4921,6 +4921,23 @@ async function updateOrderStatus(id, newStatus) {
     if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
   }
 
+  // ── Reverte fiado se pedido fiado for cancelado ───────────────
+  if (newStatus === "cancelado" && order?.pagamento === "fiado" && prevStatus !== "cancelado") {
+    const wpp = order?.cliente?.wpp?.replace(/\D/g,"");
+    if (wpp) {
+      try {
+        const accounts = await fbGet("fiadoAccounts");
+        const acc = accounts.find(a => a.clientWpp?.replace(/\D/g,"") === wpp);
+        if (acc) {
+          const novoSaldo = Math.max(0, Number(acc.saldo||0) - Number(order.total||0));
+          await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo });
+          allFiadoAccounts = allFiadoAccounts.map(a => a.id === acc.id ? { ...a, saldo: novoSaldo } : a);
+          addAuditLog(id, `Fiado revertido — pedido cancelado #${order.orderNum||id} — -R$ ${Number(order.total||0).toFixed(2)} — ${order.cliente?.nome||""}`, "fiado");
+        }
+      } catch(e) { console.warn("Erro ao reverter fiado:", e); }
+    }
+  }
+
   // ── Devolve estoque PE se cancelado ──────────────────────────
   // Restaura se: (a) flag _stockDecremented está true, OU
   //              (b) status anterior era "entregue" (estoque já foi baixado)
@@ -5298,8 +5315,47 @@ async function loadFiadoAccounts() {
   if (badgeEl) badgeEl.textContent = activeCount;
 }
 
+// ── Reconcilia saldos do fiado com base nos pedidos reais ────────────────────
+// Recalcula o saldo de cada conta somando apenas pedidos fiado não cancelados
+// e não totalmente pagos. Corrige inconsistências históricas (ex: pedido
+// cancelado após já ter sido somado ao saldo).
+async function reconcileFiadoSaldos() {
+  if (!allFiadoAccounts.length || !allOrders.length) return;
+  let changed = false;
+  for (const acc of allFiadoAccounts) {
+    if (!acc.autorizado) continue;
+    const wpp = (acc.clientWpp || "").replace(/\D/g, "");
+    if (!wpp) continue;
+    // Soma apenas pedidos fiado ativos (não cancelados, não pagos)
+    const pedidosAtivos = allOrders.filter(o =>
+      o.pagamento === "fiado" &&
+      o.status !== "cancelado" &&
+      !o.pagamentoConfirmado &&
+      (o.cliente?.wpp || "").replace(/\D/g, "") === wpp
+    );
+    const saldoReal = pedidosAtivos.reduce((s, o) => s + Number(o.total || 0), 0);
+    const saldoAtual = Number(acc.saldo || 0);
+    // Só corrige se houver diferença relevante (>= R$ 0,01)
+    if (Math.abs(saldoReal - saldoAtual) >= 0.01) {
+      try {
+        await fbUpdate("fiadoAccounts", acc.id, { saldo: saldoReal });
+        allFiadoAccounts = allFiadoAccounts.map(a =>
+          a.id === acc.id ? { ...a, saldo: saldoReal } : a
+        );
+        console.log(`[reconcileFiado] ${acc.clientNome}: R$ ${saldoAtual.toFixed(2)} → R$ ${saldoReal.toFixed(2)}`);
+        changed = true;
+      } catch(e) { console.warn("[reconcileFiado] Erro ao corrigir saldo:", e); }
+    }
+  }
+  return changed;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function renderFiadoAdmin() {
   await loadFiadoAccounts();
+  // Garante que allOrders está carregado para o reconcile poder cruzar os dados
+  if (!allOrders.length) { try { allOrders = await fbGet("orders"); } catch {} }
+  await reconcileFiadoSaldos();
   const list = document.getElementById("fiado-client-list");
   if (!list) return;
 
@@ -8464,7 +8520,7 @@ async function submitVendaPresencial() {
     status: "entregue",
     cliente: _vpClient ? { nome: _vpClient.nome, wpp: _vpClient.wpp } : { nome: "Venda Presencial", wpp: "" },
     clienteId: _vpClient?.id || null,
-    itens: items.map(i => ({ nome: i.nome, qty: i.qty, preco: i.preco })),
+    itens: items.map(i => ({ nome: i.nome, qty: i.qty, preco: i.preco, prodId: i.prodId })),
     subtotal,
     desconto: descontoValor,
     descontoTipo: window._vpDescontoTipo || "R$",
@@ -8483,6 +8539,29 @@ async function submitVendaPresencial() {
     const ref = await fbAdd("orders", order);
     order.id = ref;
     allOrders.unshift(order);
+
+    // ── Baixa estoque imediatamente na venda presencial ──────────
+    let stockChangedVP = false;
+    for (const item of items) {
+      if (!item.prodId) continue;
+      const s = allStock[item.prodId] || {};
+      const newQty = Math.max(0, (s.qty || 0) - (item.qty || 0));
+      allStock[item.prodId] = { ...s, qty: newQty };
+      try {
+        const stockDocs = await FB.getDocs(
+          FB.query(FB.collection(db, "stock"), FB.where("prodId", "==", item.prodId))
+        );
+        if (!stockDocs.empty) {
+          await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
+          stockChangedVP = true;
+        }
+      } catch(e) { console.warn("Erro ao baixar estoque VP:", e); }
+    }
+    try { await fbUpdate("orders", ref, { _stockDecremented: true }); } catch(e) {}
+    allOrders = allOrders.map(o => o.id === ref ? { ...o, _stockDecremented: true } : o);
+    if (stockChangedVP) { renderStockAdmin(); renderPEProducts(); }
+    // ─────────────────────────────────────────────────────────────
+
     // If fiado: link to client's account
     if (pagamento === "fiado" && _vpClient?.wpp) {
       let accounts = [];
