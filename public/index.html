@@ -4743,11 +4743,17 @@ async function addAuditLog(refId, msg, tipo) {
   };
   auditLog.unshift(entry);
   if (auditLog.length > 500) auditLog.pop();
-  // Persiste no Firestore em background (sem bloquear UI)
+  // Persiste no Firestore em background — desiste silenciosamente se não tiver permissão
+  if (window._historicoPermDenied) return;
   try {
     if (db && FB) {
       FB.addDoc(FB.collection(db, "historico"), { ...entry, createdAt: FB.serverTimestamp() })
-        .catch(e => console.warn("historico save:", e));
+        .catch(e => {
+          if (e?.code === "permission-denied") {
+            window._historicoPermDenied = true;
+            console.warn("Panillo: coleção 'historico' sem permissão de escrita no Firestore. Adicione a regra nas configurações do Firebase.");
+          }
+        });
     }
   } catch(e) {}
 }
