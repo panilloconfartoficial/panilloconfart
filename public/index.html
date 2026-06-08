@@ -2142,10 +2142,17 @@ img { max-width: 100%; display: block; }
       </div>
       <!-- Campos exclusivos do COMBO -->
       <div id="combo-fields" class="hidden" style="background:var(--gold-pale);border:1px solid rgba(200,144,42,0.25);border-radius:12px;padding:16px;margin-bottom:14px;">
-        <div style="font-size:13px;font-weight:500;color:var(--teal-dark);margin-bottom:10px;">🎁 Composição do Combo</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Defina quais categorias de produto fazem parte do combo e quantos itens o cliente poderá escolher de cada.</div>
-        <div id="pm-combo-slots"></div>
-        <button type="button" class="btn-sm-outline" style="margin-bottom:14px;font-size:12px;padding:5px 12px;" onclick="addComboSlotRow()">+ Adicionar categoria</button>
+        <div style="font-size:13px;font-weight:500;color:var(--teal-dark);margin-bottom:12px;">🎁 Composição do Combo</div>
+        <div class="f2">
+          <div class="fg">
+            <label class="fl">Qtd. de Cookies</label>
+            <input class="fi" id="pm-combo-cookies" type="number" min="0" value="0" placeholder="0" oninput="recalcCost()">
+          </div>
+          <div class="fg">
+            <label class="fl">Qtd. de Brownies</label>
+            <input class="fi" id="pm-combo-brownies" type="number" min="0" value="0" placeholder="0" oninput="recalcCost()">
+          </div>
+        </div>
         <div class="fg">
           <label class="fl">Itens extras (embalagem, fita, tag...)</label>
           <div id="pm-extras"></div>
@@ -3707,13 +3714,9 @@ function renderPEProducts() {
         ? "background:linear-gradient(135deg,#FDF6E8,#F5E0B0);"
         : "background:linear-gradient(135deg,#FDF0DC,#F5E0B0);";
     const cardOp = qty === 0 ? "opacity:0.55;" : "";
-    const imgContent = p.fotoUrl
-      ? `<img src="${p.fotoUrl}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;object-position:${p.fotoPos?p.fotoPos.x+'% '+p.fotoPos.y+'%':'50% 50%'};transform:scale(${p.fotoPos?p.fotoPos.zoom/100:1});transform-origin:${p.fotoPos?p.fotoPos.x+'% '+p.fotoPos.y+'%':'50% 50%'};" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
-        + `<span style="display:none;font-size:72px;align-items:center;justify-content:center;width:100%;height:100%;">${p.emoji||"🍪"}</span>`
-      : `<span style="font-size:72px;">${p.emoji || "🍪"}</span>`;
     return `<div class="product-card" style="${cardOp}" id="pe-card-${p.id}">
-      <div class="prod-img ${p.categoria}" style="${imgBg}position:relative;overflow:hidden;">
-        ${imgContent}
+      <div class="prod-img ${p.categoria}" style="${imgBg}">
+        <span style="font-size:72px;">${p.emoji || "🍪"}</span>
       </div>
       <div class="prod-body">
         <div class="prod-name">${p.nome}</div>
@@ -4645,11 +4648,40 @@ async function applyOrderDiscount(orderId) {
       descontoAdmin: descReais,
       descontoAdminTipo: tipo,
       totalOriginal: totalOriginal,
-      totalComDesconto: novoTotal
+      totalComDesconto: novoTotal,
+      total: novoTotal  // garante que order.total sempre reflita o valor real
     });
     allOrders = allOrders.map(o => o.id === orderId
-      ? { ...o, descontoAdmin: descReais, descontoAdminTipo: tipo, totalOriginal, totalComDesconto: novoTotal }
+      ? { ...o, descontoAdmin: descReais, descontoAdminTipo: tipo, totalOriginal, totalComDesconto: novoTotal, total: novoTotal }
       : o);
+
+    // ── Sincroniza com fiadoAccounts se o pedido for fiado ──────────────
+    if (order.pagamento === "fiado" && order.cliente?.wpp) {
+      const wppNorm = order.cliente.wpp.replace(/\D/g, "");
+      try {
+        const accounts = await fbGet("fiadoAccounts");
+        const acc = accounts.find(a => (a.clientWpp || "").replace(/\D/g, "") === wppNorm);
+        if (acc) {
+          // Reverte o valor antigo e aplica o novo (delta = desconto aplicado agora)
+          const oldTotal = order.totalOriginal ?? order.total ?? 0;
+          const prevDesconto = order.descontoAdmin ?? 0;
+          const deltaDesconto = descReais - prevDesconto; // quanto a mais de desconto foi aplicado
+          const novoSaldo = Math.max(0, Number(acc.saldo || 0) - deltaDesconto);
+          const histEntry = {
+            tipo: "desconto",
+            valor: descReais,
+            data: new Date().toISOString(),
+            obs: `Desconto no pedido #${order.orderNum || orderId} — ${tipo === "pct" ? val + "%" : "R$ " + descReais.toFixed(2)}`
+          };
+          const newHist = [...(acc.historico || []), histEntry];
+          await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo, historico: newHist });
+          allFiadoAccounts = allFiadoAccounts.map(a =>
+            a.id === acc.id ? { ...a, saldo: novoSaldo, historico: newHist } : a
+          );
+        }
+      } catch(e) { console.warn("Erro ao sincronizar desconto com fiado:", e); }
+    }
+
     showToast("Desconto de R$ " + descReais.toFixed(2).replace(".",",") + " aplicado!");
     renderOrders();
     addAuditLog(orderId, "Desconto admin: -R$ " + descReais.toFixed(2) + " (" + (tipo === "pct" ? val + "%" : "fixo") + ")", "desconto");
@@ -4693,7 +4725,7 @@ async function updateOrderPayMethod(id, newPay) {
       showToast(`Conta fiado criada para ${order.cliente.nome || "cliente"}`, "success");
     } else {
       // Add to existing balance
-      const novoSaldo = Number(acc.saldo||0) + Number(order.total||0);
+      const novoSaldo = Number(acc.saldo||0) + Number(order.totalComDesconto ?? order.total || 0);
       try { await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo }); } catch {}
       showToast(`Valor adicionado à conta fiado de ${order.cliente.nome || "cliente"}`, "success");
     }
@@ -4894,18 +4926,53 @@ async function updateOrderStatus(id, newStatus) {
   updateMbnBadge(badge);
   addAuditLog(id, `Status: ${statusLabel(prevStatus)} → ${statusLabel(newStatus)} (${order?.cliente?.nome||"cliente"})`, "status");
 
+  // ── Reverte saldo fiado se pedido for cancelado ────────────────────────
+  if (newStatus === "cancelado" && prevStatus !== "cancelado" &&
+      order?.pagamento === "fiado" && order?.cliente?.wpp) {
+    const wppNorm = order.cliente.wpp.replace(/\D/g, "");
+    // Usa totalComDesconto se houver desconto aplicado, senão total
+    const orderTotal = Number(order.totalComDesconto ?? order.total ?? 0);
+    if (orderTotal > 0) {
+      try {
+        const accounts = await fbGet("fiadoAccounts");
+        const acc = accounts.find(a => (a.clientWpp || "").replace(/\D/g, "") === wppNorm);
+        if (acc) {
+          const novoSaldo = Math.max(0, Number(acc.saldo || 0) - orderTotal);
+          const histEntry = {
+            tipo: "estorno",
+            valor: orderTotal,
+            data: new Date().toISOString(),
+            obs: `Pedido #${order.orderNum || order.id} cancelado — estorno automático`
+          };
+          const newHist = [...(acc.historico || []), histEntry];
+          await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo, historico: newHist });
+          allFiadoAccounts = allFiadoAccounts.map(a =>
+            a.id === acc.id ? { ...a, saldo: novoSaldo, historico: newHist } : a
+          );
+          addAuditLog(acc.id, `Fiado — estorno R$ ${orderTotal.toFixed(2)} (pedido #${order.orderNum || order.id} cancelado) — ${acc.clientNome}`, "fiado");
+          showToast(`Saldo fiado de ${acc.clientNome} revertido em R$ ${orderTotal.toFixed(2).replace(".",",")}`, "success");
+        }
+      } catch(e) { console.warn("Erro ao reverter fiado:", e); }
+    }
+  }
+
   // ── Baixa estoque PE ao entregar ──────────────────────────────
   if (newStatus === "entregue" && prevStatus !== "entregue" &&
       order && order.tipo === "pronta-entrega" && !order._stockDecremented) {
     let stockChanged = false;
     for (const item of (order.itens || [])) {
-      if (!item.prodId) continue;
-      const s = allStock[item.prodId] || {};
+      let prodId = item.prodId;
+      if (!prodId && item.nome) {
+        const prod = allProducts.find(p => p.nome === item.nome);
+        prodId = prod?.id;
+      }
+      if (!prodId) continue;
+      const s = allStock[prodId] || {};
       const newQty = Math.max(0, (s.qty || 0) - (item.qty || 0));
-      allStock[item.prodId] = { ...s, qty: newQty };
+      allStock[prodId] = { ...s, qty: newQty };
       try {
         const stockDocs = await FB.getDocs(
-          FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prodId))
+          FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId))
         );
         if (!stockDocs.empty) {
           await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
@@ -4919,20 +4986,23 @@ async function updateOrderStatus(id, newStatus) {
   }
 
   // ── Devolve estoque PE se cancelado ──────────────────────────
-  // Restaura se: (a) flag _stockDecremented está true, OU
-  //              (b) status anterior era "entregue" (estoque já foi baixado)
   if (newStatus === "cancelado" && order?.tipo === "pronta-entrega") {
     const shouldRestore = order._stockDecremented === true || prevStatus === "entregue";
     if (shouldRestore) {
       let stockChanged = false;
       for (const item of (order.itens || [])) {
-        if (!item.prodId) continue;
-        const s = allStock[item.prodId] || {};
+        let prodId = item.prodId;
+        if (!prodId && item.nome) {
+          const prod = allProducts.find(p => p.nome === item.nome);
+          prodId = prod?.id;
+        }
+        if (!prodId) continue;
+        const s = allStock[prodId] || {};
         const restored = (s.qty || 0) + (item.qty || 0);
-        allStock[item.prodId] = { ...s, qty: restored };
+        allStock[prodId] = { ...s, qty: restored };
         try {
           const stockDocs = await FB.getDocs(
-            FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prodId))
+            FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId))
           );
           if (!stockDocs.empty) {
             await FB.updateDoc(stockDocs.docs[0].ref, { qty: restored });
@@ -5176,8 +5246,14 @@ async function reconcileStock() {
   const deltas = {}; // { prodId: totalQtyToSubtract }
   for (const order of pending) {
     for (const item of (order.itens || [])) {
-      if (!item.prodId) continue;
-      deltas[item.prodId] = (deltas[item.prodId] || 0) + (item.qty || 0);
+      // Se não tem prodId, tenta resolver pelo nome do produto
+      let prodId = item.prodId;
+      if (!prodId && item.nome) {
+        const prod = allProducts.find(p => p.nome === item.nome);
+        prodId = prod?.id;
+      }
+      if (!prodId) continue;
+      deltas[prodId] = (deltas[prodId] || 0) + (item.qty || 0);
     }
   }
 
@@ -5389,7 +5465,7 @@ async function renderFiadoAdmin() {
     const pedidosHTML = pedidosFiado.length === 0
       ? `<div style="font-size:12px;color:var(--muted);padding:8px 0 4px;">Nenhum pedido fiado encontrado.</div>`
       : pedidosFiado.map(o => {
-          const oTotal = o.total || 0;
+          const oTotal = o.totalComDesconto ?? o.total ?? 0;
           const oDate  = o.dataRetirada ? new Date(o.dataRetirada+"T12:00").toLocaleDateString("pt-BR") : (o.createdAt ? new Date(o.createdAt.seconds*1000).toLocaleDateString("pt-BR") : "—");
           const oItens = (o.itens||[]).map(i=>`${i.qty}× ${i.nome}`).join(", ");
           const oPago  = o.pagamentoConfirmado ? `<span style="color:var(--teal);font-size:10px;font-weight:600;">✓ pago</span>` : `<span style="color:#e74c3c;font-size:10px;font-weight:600;">em aberto</span>`;
@@ -5847,11 +5923,6 @@ function openProdModal(id) {
   document.getElementById("crop-y-val").textContent    = "50%";
   showCropPanel(false);
 
-  // Reset combo fields
-  document.getElementById("combo-fields").classList.add("hidden");
-  document.getElementById("pm-combo-slots").innerHTML = "";
-  document.getElementById("pm-extras").innerHTML = "";
-
   if (id) {
     const p = allProducts.find(x => x.id === id);
     if (p) {
@@ -5861,16 +5932,6 @@ function openProdModal(id) {
       document.getElementById("pm-preco").value = p.preco;
       document.getElementById("pm-rend").value  = p.rendimento || "";
       document.getElementById("pm-title").textContent = "Editar produto";
-      toggleComboFields(p.categoria);
-      if (p.categoria === "combo") {
-        if (p.comboSlots && p.comboSlots.length > 0) {
-          p.comboSlots.forEach(slot => addComboSlotRow(slot));
-        } else {
-          if ((p.comboCookies  || 0) > 0) addComboSlotRow({ categoria: "cookie",  qty: p.comboCookies });
-          if ((p.comboBrownies || 0) > 0) addComboSlotRow({ categoria: "brownie", qty: p.comboBrownies });
-        }
-        if (p.comboExtras) p.comboExtras.forEach(e => addExtraRow(e));
-      }
       if (p.ingredientes) p.ingredientes.forEach(i => addIngRow(i));
       // Restaura foto e enquadramento existentes
       if (p.fotoUrl) {
@@ -5981,23 +6042,11 @@ async function saveProduct() {
     badge: "",
     fotoUrl:       _currentPhotoBase64 || null,
     fotoPos:       _currentPhotoBase64 ? _currentFotoPos : null,
-    ...(isCombo ? (() => {
-      // Lê os slots dinâmicos de composição do combo
-      const comboSlots = [];
-      let comboCookies = 0, comboBrownies = 0;
-      document.querySelectorAll("#pm-combo-slots > div").forEach(row => {
-        const sel = row.querySelector("select");
-        const inp = row.querySelector("input[type=number]");
-        if (!sel || !inp) return;
-        const categoria = sel.value;
-        const qty       = parseInt(inp.value) || 1;
-        comboSlots.push({ categoria, qty });
-        // mantém campos legados para compatibilidade com openComboModal
-        if (categoria === "cookie")  comboCookies  += qty;
-        if (categoria === "brownie") comboBrownies += qty;
-      });
-      return { comboSlots, comboCookies, comboBrownies, comboExtras };
-    })() : {})
+    ...(isCombo ? {
+      comboCookies:  parseInt(document.getElementById("pm-combo-cookies").value)  || 0,
+      comboBrownies: parseInt(document.getElementById("pm-combo-brownies").value) || 0,
+      comboExtras,
+    } : {})
   };
 
   if (editingProdId) {
@@ -7919,59 +7968,37 @@ function openComboModal(prodId) {
   document.getElementById("combo-extras-label").textContent =
     extras.length ? "Inclui: " + extras.join(", ") : "";
 
-  // Monta slots dinâmicos a partir de comboSlots (nova estrutura) ou campos legados
-  const slots = prod.comboSlots && prod.comboSlots.length > 0
-    ? prod.comboSlots
-    : [
-        ...(nCookies  > 0 ? [{ categoria: "cookie",  qty: nCookies  }] : []),
-        ...(nBrownies > 0 ? [{ categoria: "brownie", qty: nBrownies }] : [])
-      ];
-
-  const cookieSection  = document.getElementById("combo-cookies-section");
-  const brownieSection = document.getElementById("combo-brownies-section");
-  const cookieSlots    = document.getElementById("combo-cookie-slots");
-  const brownieSlots   = document.getElementById("combo-brownie-slots");
-
-  // Limpa e esconde as seções fixas antigas — usamos apenas cookie-slots como container genérico
-  brownieSection.style.display = "none";
-  brownieSlots.innerHTML = "";
-  cookieSlots.innerHTML  = "";
-
-  if (slots.length === 0) {
-    cookieSection.style.display = "block";
-    cookieSlots.innerHTML = `<div style="font-size:12px;color:#c0392b;background:#fdecea;border-radius:8px;padding:10px 12px;">
-      ⚠️ Este combo não tem composição configurada. Configure no painel admin.
-    </div>`;
-  } else {
-    cookieSection.style.display = "block";
-    document.querySelector("#combo-cookies-section > div:first-child").style.display = "none"; // esconde título fixo
-    slots.forEach((slot, si) => {
-      const catLabel = slot.categoria.charAt(0).toUpperCase() + slot.categoria.slice(1);
-      const prods    = allProducts.filter(p => p.categoria === slot.categoria && p.ativo !== false);
-      if (prods.length === 0) {
-        cookieSlots.innerHTML += `<div style="font-size:12px;color:#c0392b;background:#fdecea;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-          ⚠️ Nenhum produto da categoria "${catLabel}" cadastrado. Verifique o painel admin.
-        </div>`;
-        return;
-      }
-      const catEmoji = slot.categoria === "cookie" ? "🍪" : slot.categoria === "brownie" ? "🍫" : "🎂";
-      cookieSlots.innerHTML += `<div style="margin-bottom:14px;">
-        <div style="font-size:13px;font-weight:500;color:var(--teal-dark);margin-bottom:8px;">${catEmoji} Escolha ${slot.qty > 1 ? "os sabores" : "o sabor"} de ${catLabel}</div>`;
-      for (let i = 0; i < slot.qty; i++) {
-        const selectId = `combo-slot-${si}-${i}`;
-        cookieSlots.innerHTML += `
-          <div class="fg" style="margin-bottom:8px;">
-            <label class="fl">${catLabel} ${slot.qty > 1 ? i+1 : ""}</label>
-            <select class="fi" id="${selectId}" data-slot="${si}" data-idx="${i}" style="padding:9px 12px;">
-              ${prods.map(p => `<option value="${p.nome}">${p.nome}</option>`).join("")}
-            </select>
-          </div>`;
-      }
-      cookieSlots.innerHTML += `</div>`;
-    });
+  // Cookie slots
+  const cookieProds = allProducts.filter(p => p.categoria === "cookie" && p.ativo !== false);
+  const cookieSection = document.getElementById("combo-cookies-section");
+  const cookieSlots   = document.getElementById("combo-cookie-slots");
+  cookieSection.style.display = nCookies > 0 ? "block" : "none";
+  cookieSlots.innerHTML = "";
+  for (let i = 0; i < nCookies; i++) {
+    cookieSlots.innerHTML += `
+      <div class="fg" style="margin-bottom:8px;">
+        <label class="fl">Cookie ${i+1}</label>
+        <select class="fi" id="combo-cookie-${i}" style="padding:9px 12px;">
+          ${cookieProds.map(p => `<option value="${p.nome}">${p.nome}</option>`).join("")}
+        </select>
+      </div>`;
   }
-  // Salva slots no currentCombo para o addComboToCart ler
-  currentCombo.slots = slots;
+
+  // Brownie slots
+  const brownieProds = allProducts.filter(p => p.categoria === "brownie" && p.ativo !== false);
+  const brownieSection = document.getElementById("combo-brownies-section");
+  const brownieSlots   = document.getElementById("combo-brownie-slots");
+  brownieSection.style.display = nBrownies > 0 ? "block" : "none";
+  brownieSlots.innerHTML = "";
+  for (let i = 0; i < nBrownies; i++) {
+    brownieSlots.innerHTML += `
+      <div class="fg" style="margin-bottom:8px;">
+        <label class="fl">Brownie ${i+1}</label>
+        <select class="fi" id="combo-brownie-${i}" style="padding:9px 12px;">
+          ${brownieProds.map(p => `<option value="${p.nome}">${p.nome}</option>`).join("")}
+        </select>
+      </div>`;
+  }
 
   document.getElementById("combo-obs").value = "";
   document.getElementById("combo-modal").classList.add("open");
@@ -7988,24 +8015,14 @@ function addComboToCart() {
   const nCookies  = parseInt(prod.comboCookies  || 0);
   const nBrownies = parseInt(prod.comboBrownies || 0);
 
-  if (nCookies === 0 && nBrownies === 0) {
-    showToast("Este combo não tem produtos configurados. Configure no painel admin.");
-    return;
-  }
-
   const sabores = [];
-  const slots = currentCombo.slots || [];
-  for (let si = 0; si < slots.length; si++) {
-    const slot = slots[si];
-    for (let i = 0; i < slot.qty; i++) {
-      const sel = document.getElementById(`combo-slot-${si}-${i}`);
-      if (!sel || !sel.value) {
-        const catLabel = slot.categoria.charAt(0).toUpperCase() + slot.categoria.slice(1);
-        showToast(`Escolha todos os sabores de ${catLabel}!`);
-        return;
-      }
-      sabores.push(sel.value);
-    }
+  for (let i = 0; i < nCookies; i++) {
+    const sel = document.getElementById(`combo-cookie-${i}`);
+    if (sel) sabores.push(sel.value);
+  }
+  for (let i = 0; i < nBrownies; i++) {
+    const sel = document.getElementById(`combo-brownie-${i}`);
+    if (sel) sabores.push(sel.value);
   }
   const obs = document.getElementById("combo-obs").value.trim();
 
@@ -8020,51 +8037,13 @@ function addComboToCart() {
 // ─── PRODUTO MODAL: COMBO FIELDS TOGGLE ────────────────
 function toggleComboFields(cat) {
   const comboFields = document.getElementById("combo-fields");
-  const ingsWrapper = document.getElementById("pm-ings")?.closest("div[style]") || document.getElementById("pm-ings")?.parentElement;
+  const ingsSection = document.getElementById("pm-ings")?.closest("div");
   if (!comboFields) return;
   if (cat === "combo") {
     comboFields.classList.remove("hidden");
-    // Esconde a seção de ingredientes para combos (não faz sentido)
-    if (ingsWrapper) ingsWrapper.style.display = "none";
-    // Garante pelo menos 1 slot de categoria
-    if (!document.getElementById("pm-combo-slots").hasChildNodes()) addComboSlotRow();
   } else {
     comboFields.classList.add("hidden");
-    if (ingsWrapper) ingsWrapper.style.display = "";
   }
-}
-
-function addComboSlotRow(data) {
-  const container = document.getElementById("pm-combo-slots");
-  if (!container) return;
-  const rowId = "cslot-" + Date.now() + "-" + Math.random().toString(36).slice(2,6);
-
-  // Monta opções de categoria a partir dos produtos existentes + categorias fixas
-  const cats = [...new Set(["cookie", "brownie", ...allProducts.filter(p=>p.ativo!==false&&p.categoria!=="combo").map(p=>p.categoria)])];
-  const catOptions = cats.map(c => {
-    const labels = { cookie:"🍪 Cookie", brownie:"🍫 Brownie" };
-    const label  = labels[c] || (c.charAt(0).toUpperCase() + c.slice(1));
-    const sel    = data && data.categoria === c ? "selected" : "";
-    return `<option value="${c}" ${sel}>${label}</option>`;
-  }).join("");
-
-  const qty = data ? (data.qty || 1) : 1;
-
-  const row = document.createElement("div");
-  row.id = rowId;
-  row.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:8px;background:#fff;border-radius:8px;padding:8px 10px;border:1px solid rgba(200,144,42,0.2);";
-  row.innerHTML = `
-    <div style="flex:2;">
-      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Categoria</label>
-      <select class="fi" style="padding:7px 10px;font-size:13px;" onchange="recalcCost()">${catOptions}</select>
-    </div>
-    <div style="flex:1;">
-      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Qtd. a escolher</label>
-      <input class="fi" type="number" min="1" value="${qty}" style="padding:7px 10px;font-size:13px;" oninput="recalcCost()">
-    </div>
-    <button onclick="document.getElementById('${rowId}').remove();recalcCost();" title="Remover"
-      style="background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;margin-top:14px;flex-shrink:0;">×</button>`;
-  container.appendChild(row);
 }
 
 function addExtraRow(data) {
@@ -8558,7 +8537,7 @@ async function submitVendaPresencial() {
     status: "entregue",
     cliente: _vpClient ? { nome: _vpClient.nome, wpp: _vpClient.wpp } : { nome: "Venda Presencial", wpp: "" },
     clienteId: _vpClient?.id || null,
-    itens: items.map(i => ({ nome: i.nome, qty: i.qty, preco: i.preco })),
+    itens: items.map(i => ({ prodId: i.prodId, nome: i.nome, qty: i.qty, preco: i.preco })),
     subtotal,
     desconto: descontoValor,
     descontoTipo: window._vpDescontoTipo || "R$",
@@ -8577,6 +8556,27 @@ async function submitVendaPresencial() {
     const ref = await fbAdd("orders", order);
     order.id = ref;
     allOrders.unshift(order);
+
+    // ── Baixa estoque imediatamente (VP já nasce "entregue") ──────────
+    let stockChanged = false;
+    for (const item of items) {
+      if (!item.prodId) continue;
+      const s = allStock[item.prodId] || {};
+      const newQty = Math.max(0, (s.qty || 0) - (item.qty || 0));
+      allStock[item.prodId] = { ...s, qty: newQty };
+      try {
+        const stockDocs = await FB.getDocs(
+          FB.query(FB.collection(db, "stock"), FB.where("prodId", "==", item.prodId))
+        );
+        if (!stockDocs.empty) {
+          await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
+          stockChanged = true;
+        }
+      } catch(e) { console.warn("VP: erro ao baixar estoque:", e); }
+    }
+    try { await fbUpdate("orders", ref, { _stockDecremented: true }); } catch(e) {}
+    allOrders = allOrders.map(o => o.id === ref ? { ...o, _stockDecremented: true } : o);
+    if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
     // If fiado: link to client's account
     if (pagamento === "fiado" && _vpClient?.wpp) {
       let accounts = [];
