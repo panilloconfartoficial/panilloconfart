@@ -3498,14 +3498,14 @@ window.addEventListener("firebase-ready", () => {
   WPP_NUMBER = window._wppNumber || "";
   PIX_KEY    = window._pixKey    || "";
 
-  // Observa estado de autenticação — redireciona automaticamente se já logada
+  // Observa estado de autenticação — redireciona automaticamente se já logado
+  // Só age se a rota for /admin e a página de login estiver ativa
   FB.onAuthStateChanged(auth, (user) => {
     if (user) {
-      const loginActive = document.getElementById("page-login").classList.contains("active");
-      const onAdminRoute = window.location.pathname === "/admin" || window.location.pathname === "/admin/";
-      if (loginActive || onAdminRoute) {
+      const path = window.location.pathname;
+      const loginActive = document.getElementById("page-login")?.classList.contains("active");
+      if (loginActive && (path === "/admin" || path === "/admin/")) {
         showPage("page-admin");
-        // loadDashboard será chamado automaticamente dentro de loadOrders()
         showMobBottomNav(true);
       }
     }
@@ -4649,23 +4649,21 @@ async function applyOrderDiscount(orderId) {
       descontoAdminTipo: tipo,
       totalOriginal: totalOriginal,
       totalComDesconto: novoTotal,
-      total: novoTotal  // garante que order.total sempre reflita o valor real
+      total: novoTotal
     });
     allOrders = allOrders.map(o => o.id === orderId
       ? { ...o, descontoAdmin: descReais, descontoAdminTipo: tipo, totalOriginal, totalComDesconto: novoTotal, total: novoTotal }
       : o);
 
-    // ── Sincroniza com fiadoAccounts se o pedido for fiado ──────────────
+    // Sincroniza com fiadoAccounts se pedido for fiado
     if (order.pagamento === "fiado" && order.cliente?.wpp) {
       const wppNorm = order.cliente.wpp.replace(/\D/g, "");
       try {
         const accounts = await fbGet("fiadoAccounts");
         const acc = accounts.find(a => (a.clientWpp || "").replace(/\D/g, "") === wppNorm);
         if (acc) {
-          // Reverte o valor antigo e aplica o novo (delta = desconto aplicado agora)
-          const oldTotal = order.totalOriginal ?? order.total ?? 0;
           const prevDesconto = order.descontoAdmin ?? 0;
-          const deltaDesconto = descReais - prevDesconto; // quanto a mais de desconto foi aplicado
+          const deltaDesconto = descReais - prevDesconto;
           const novoSaldo = Math.max(0, Number(acc.saldo || 0) - deltaDesconto);
           const histEntry = {
             tipo: "desconto",
@@ -4725,7 +4723,7 @@ async function updateOrderPayMethod(id, newPay) {
       showToast(`Conta fiado criada para ${order.cliente.nome || "cliente"}`, "success");
     } else {
       // Add to existing balance
-      const novoSaldo = Number(acc.saldo||0) + Number(order.totalComDesconto ?? order.total || 0);
+      const novoSaldo = Number(acc.saldo||0) + Number(order.totalComDesconto ?? (order.total || 0));
       try { await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo }); } catch {}
       showToast(`Valor adicionado à conta fiado de ${order.cliente.nome || "cliente"}`, "success");
     }
@@ -4930,7 +4928,6 @@ async function updateOrderStatus(id, newStatus) {
   if (newStatus === "cancelado" && prevStatus !== "cancelado" &&
       order?.pagamento === "fiado" && order?.cliente?.wpp) {
     const wppNorm = order.cliente.wpp.replace(/\D/g, "");
-    // Usa totalComDesconto se houver desconto aplicado, senão total
     const orderTotal = Number(order.totalComDesconto ?? order.total ?? 0);
     if (orderTotal > 0) {
       try {
@@ -4962,22 +4959,14 @@ async function updateOrderStatus(id, newStatus) {
     let stockChanged = false;
     for (const item of (order.itens || [])) {
       let prodId = item.prodId;
-      if (!prodId && item.nome) {
-        const prod = allProducts.find(p => p.nome === item.nome);
-        prodId = prod?.id;
-      }
+      if (!prodId && item.nome) { const p = allProducts.find(p => p.nome === item.nome); prodId = p?.id; }
       if (!prodId) continue;
       const s = allStock[prodId] || {};
       const newQty = Math.max(0, (s.qty || 0) - (item.qty || 0));
       allStock[prodId] = { ...s, qty: newQty };
       try {
-        const stockDocs = await FB.getDocs(
-          FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId))
-        );
-        if (!stockDocs.empty) {
-          await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
-          stockChanged = true;
-        }
+        const stockDocs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId)));
+        if (!stockDocs.empty) { await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty }); stockChanged = true; }
       } catch(e) { console.warn("Erro ao baixar estoque:", e); }
     }
     try { await fbUpdate("orders", id, { _stockDecremented: true }); } catch(e) {}
@@ -4992,22 +4981,14 @@ async function updateOrderStatus(id, newStatus) {
       let stockChanged = false;
       for (const item of (order.itens || [])) {
         let prodId = item.prodId;
-        if (!prodId && item.nome) {
-          const prod = allProducts.find(p => p.nome === item.nome);
-          prodId = prod?.id;
-        }
+        if (!prodId && item.nome) { const p = allProducts.find(p => p.nome === item.nome); prodId = p?.id; }
         if (!prodId) continue;
         const s = allStock[prodId] || {};
         const restored = (s.qty || 0) + (item.qty || 0);
         allStock[prodId] = { ...s, qty: restored };
         try {
-          const stockDocs = await FB.getDocs(
-            FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId))
-          );
-          if (!stockDocs.empty) {
-            await FB.updateDoc(stockDocs.docs[0].ref, { qty: restored });
-            stockChanged = true;
-          }
+          const stockDocs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId)));
+          if (!stockDocs.empty) { await FB.updateDoc(stockDocs.docs[0].ref, { qty: restored }); stockChanged = true; }
         } catch(e) { console.warn("Erro ao restaurar estoque:", e); }
       }
       try { await fbUpdate("orders", id, { _stockDecremented: false }); } catch(e) {}
@@ -5242,16 +5223,11 @@ async function reconcileStock() {
 
   console.log(`[reconcile] ${pending.length} pedido(s) PE entregue(s) sem desconto de estoque. Corrigindo…`);
 
-  // Calcula o delta total por produto de uma vez
-  const deltas = {}; // { prodId: totalQtyToSubtract }
+  const deltas = {};
   for (const order of pending) {
     for (const item of (order.itens || [])) {
-      // Se não tem prodId, tenta resolver pelo nome do produto
       let prodId = item.prodId;
-      if (!prodId && item.nome) {
-        const prod = allProducts.find(p => p.nome === item.nome);
-        prodId = prod?.id;
-      }
+      if (!prodId && item.nome) { const p = allProducts.find(p => p.nome === item.nome); prodId = p?.id; }
       if (!prodId) continue;
       deltas[prodId] = (deltas[prodId] || 0) + (item.qty || 0);
     }
@@ -8140,29 +8116,35 @@ document.addEventListener("DOMContentLoaded", () => {
   loadConfig();
   applyLogo(LOGO_BASE64);
 
-  // Rota /admin → se já autenticado vai direto ao painel, senão abre login
+  // Rota /admin → aguarda Firebase estar pronto antes de decidir
   const path = window.location.pathname;
   if (path === "/admin" || path === "/admin/") {
-    const currentUser = window._auth?.currentUser;
-    if (currentUser) {
-      showPage("page-admin");
-      loadDashboard();
-      showMobBottomNav(true);
-    } else {
-      // Aguarda onAuthStateChanged resolver antes de decidir
-      const unsubRoute = window._fbModules?.onAuthStateChanged
-        ? window._fbModules.onAuthStateChanged(window._auth, (user) => {
-            unsubRoute && unsubRoute();
-            if (user) {
-              showPage("page-admin");
-              loadDashboard();
-              showMobBottomNav(true);
-            } else {
-              showPage("page-login");
-            }
-          })
-        : showPage("page-login");
+    function _doAdminRoute() {
+      const fbReady = window._auth && window._fbModules?.onAuthStateChanged;
+      if (!fbReady) {
+        // Firebase ainda não inicializou — aguarda o evento
+        window.addEventListener("firebase-ready", _doAdminRoute, { once: true });
+        return;
+      }
+      const currentUser = window._auth.currentUser;
+      if (currentUser) {
+        showPage("page-admin");
+        loadDashboard();
+        showMobBottomNav(true);
+      } else {
+        const unsub = window._fbModules.onAuthStateChanged(window._auth, (user) => {
+          unsub && unsub();
+          if (user) {
+            showPage("page-admin");
+            loadDashboard();
+            showMobBottomNav(true);
+          } else {
+            showPage("page-login");
+          }
+        });
+      }
     }
+    _doAdminRoute();
   }
 });
 
@@ -8557,7 +8539,7 @@ async function submitVendaPresencial() {
     order.id = ref;
     allOrders.unshift(order);
 
-    // ── Baixa estoque imediatamente (VP já nasce "entregue") ──────────
+    // Baixa estoque imediatamente (VP já nasce "entregue")
     let stockChanged = false;
     for (const item of items) {
       if (!item.prodId) continue;
@@ -8565,13 +8547,8 @@ async function submitVendaPresencial() {
       const newQty = Math.max(0, (s.qty || 0) - (item.qty || 0));
       allStock[item.prodId] = { ...s, qty: newQty };
       try {
-        const stockDocs = await FB.getDocs(
-          FB.query(FB.collection(db, "stock"), FB.where("prodId", "==", item.prodId))
-        );
-        if (!stockDocs.empty) {
-          await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
-          stockChanged = true;
-        }
+        const stockDocs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prodId)));
+        if (!stockDocs.empty) { await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty }); stockChanged = true; }
       } catch(e) { console.warn("VP: erro ao baixar estoque:", e); }
     }
     try { await fbUpdate("orders", ref, { _stockDecremented: true }); } catch(e) {}
