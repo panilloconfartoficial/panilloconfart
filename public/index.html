@@ -229,6 +229,10 @@
 .admin-dark .admin-sidebar .sb-exit:hover span { color: #E8C9A0 !important; }
 .admin-dark .admin-sidebar .sb-logo-c img { filter: brightness(0.9); }
 
+/* ai-panel é sempre escuro — neutralizar qualquer override do dark mode */
+.admin-dark #page-admin .ai-panel { background: #1E0A03 !important; }
+.admin-dark #page-admin .ai-input { background: rgba(0,0,0,0.35) !important; color: #F0DEC8 !important; border-color: rgba(255,255,255,0.12) !important; }
+
 /* Botão dark mode na topbar */
 #dark-toggle-btn {
   background: none;
@@ -839,43 +843,46 @@ img { max-width: 100%; display: block; }
 
 /* ─── AI PANEL ─── */
 .ai-panel {
-  background: var(--teal-dark); border-radius: 14px; padding: 20px; margin-bottom: 20px;
+  /* Sempre escuro — independente do tema claro/dark */
+  background: #1E0A03; border-radius: 14px; padding: 20px; margin-bottom: 20px;
 }
 .ai-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-.ai-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold-light); flex-shrink: 0; }
-.ai-title { color: #fff; font-size: 15px; font-weight: 500; }
+.ai-dot { width: 8px; height: 8px; border-radius: 50%; background: #C47B35; flex-shrink: 0; }
+.ai-title { color: #F0DEC8; font-size: 15px; font-weight: 500; }
 .ai-badge {
-  background: rgba(200,144,42,0.2); color: var(--gold-light);
-  border: 1px solid rgba(200,144,42,0.3); font-size: 10px;
+  background: rgba(196,123,53,0.2); color: #C47B35;
+  border: 1px solid rgba(196,123,53,0.35); font-size: 10px;
   padding: 2px 9px; border-radius: 8px; letter-spacing: 0.5px;
 }
 .ai-insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
 .ai-insight {
-  background: rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;
+  background: rgba(255,255,255,0.05); border-radius: 10px; padding: 12px;
+  border: 0.5px solid rgba(255,255,255,0.07);
 }
 .ai-insight-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 500; }
-.ai-insight.pos .ai-insight-type { color: #9FE1CB; }
-.ai-insight.neg .ai-insight-type { color: #F5C4B3; }
-.ai-insight-text { font-size: 12px; color: rgba(255,255,255,0.8); line-height: 1.55; }
+.ai-insight.pos .ai-insight-type { color: #7ECDB5; }
+.ai-insight.neg .ai-insight-type { color: #F5A891; }
+.ai-insight-text { font-size: 12px; color: rgba(255,255,255,0.82); line-height: 1.6; }
 .ai-input-row { display: flex; gap: 8px; }
 .ai-input {
-  flex: 1; background: rgba(255,255,255,0.08);
+  flex: 1; background: rgba(0,0,0,0.35);
   border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
-  padding: 9px 13px; color: #fff; font-size: 13px; outline: none;
+  padding: 9px 13px; color: #F0DEC8; font-size: 13px; outline: none;
   transition: border-color .2s;
 }
-.ai-input:focus { border-color: rgba(255,255,255,0.3); }
-.ai-input::placeholder { color: rgba(255,255,255,0.35); }
+.ai-input:focus { border-color: rgba(196,123,53,0.5); }
+.ai-input::placeholder { color: rgba(255,255,255,0.3); }
 .ai-send {
-  background: var(--gold); color: #fff; border: none;
+  background: #8B4513; color: #fff; border: none;
   padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
-  transition: background .2s;
+  transition: background .2s; cursor: pointer;
 }
-.ai-send:hover { background: var(--gold-dark); }
+.ai-send:hover { background: #6B2E0E; }
 .ai-response { margin-top: 10px; }
 .ai-response-bubble {
-  background: rgba(255,255,255,0.08); border-radius: 10px;
-  padding: 12px 14px; font-size: 13px; color: rgba(255,255,255,0.85); line-height: 1.6;
+  background: rgba(0,0,0,0.25); border-radius: 10px;
+  padding: 12px 14px; font-size: 13px; color: rgba(255,255,255,0.88); line-height: 1.6;
+  border: 0.5px solid rgba(255,255,255,0.08);
 }
 
 /* ─── TWO COL ─── */
