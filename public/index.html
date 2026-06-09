@@ -176,6 +176,7 @@
 .admin-dark #page-admin .orders-search,
 .admin-dark #page-admin .clients-search,
 .admin-dark #page-admin .status-select,
+.admin-dark #page-admin select { color: #F0DEC8 !important; }
 .admin-dark #page-admin select,
 .admin-dark #page-admin input[type="text"],
 .admin-dark #page-admin input[type="number"],
@@ -197,10 +198,39 @@
 }
 .admin-dark #page-admin .btn-sm-outline {
   background: #2A1208;
-  border-color: rgba(255,255,255,0.15);
-  color: #E8C9A0;
+  border-color: rgba(255,255,255,0.2);
+  color: #E8C9A0 !important;
 }
-.admin-dark #page-admin .btn-sm-outline:hover { background: #381808; }
+.admin-dark #page-admin .btn-sm-outline:hover { background: #381808; color: #F0DEC8 !important; }
+
+/* Botões primários no dark: fundo caramelo claro → texto escuro para legibilidade */
+.admin-dark #page-admin .btn-sm-primary {
+  background: #C47B35;
+  color: #1E0A03 !important;
+  font-weight: 600;
+}
+.admin-dark #page-admin .btn-sm-primary:hover { background: #E8C9A0; color: #1E0A03 !important; }
+
+/* Botões de salvar inline com background claro */
+.admin-dark #page-admin button[style*="background:var(--teal-dark)"],
+.admin-dark #page-admin button[style*="background: var(--teal-dark)"] {
+  color: #1E0A03 !important;
+}
+
+/* gen-btn (Gerar com IA) */
+.admin-dark #page-admin .gen-btn {
+  background: #C47B35;
+  color: #1E0A03 !important;
+  font-weight: 600;
+}
+.admin-dark #page-admin .gen-btn:hover { background: #E8C9A0; color: #1E0A03 !important; }
+
+/* Qualquer botão inline cujo fundo virar claro no dark */
+.admin-dark #page-admin .pay-confirm-btn {
+  background: #2A1208;
+  color: #E8C9A0 !important;
+  border-color: rgba(255,255,255,0.1);
+}
 .admin-dark #page-admin .result-box    { background: #2A1208; }
 .admin-dark #page-admin .dep-admin-card { background: #2A1208; border-color: rgba(255,255,255,0.08); }
 .admin-dark #page-admin .dep-reply     { background: #1E0E07; }
@@ -228,6 +258,30 @@
 .admin-dark .admin-sidebar .sb-exit span { color: rgba(255,255,255,0.35) !important; }
 .admin-dark .admin-sidebar .sb-exit:hover span { color: #E8C9A0 !important; }
 .admin-dark .admin-sidebar .sb-logo-c img { filter: brightness(0.9); }
+
+/* Botões inline com var(--teal) ou var(--teal-dark) como fundo ficam claros no dark */
+.admin-dark #page-admin button[style*="background:var(--teal)"],
+.admin-dark #page-admin button[style*="background: var(--teal)"] {
+  color: #1E0A03 !important;
+  font-weight: 600;
+}
+
+/* Exportar CSV e filtros — garantir legibilidade */
+.admin-dark #page-admin .orders-search,
+.admin-dark #page-admin .clients-search {
+  color: #F0DEC8 !important;
+  background: #1E0E07 !important;
+}
+.admin-dark #page-admin .orders-search::placeholder,
+.admin-dark #page-admin .clients-search::placeholder { color: rgba(255,255,255,0.3); }
+
+/* gen-opt selecionado no dark mode — fundo claro exige texto escuro */
+.admin-dark #page-admin .gen-opt.sel {
+  background: rgba(196,123,53,0.15) !important;
+  border-color: #C47B35 !important;
+  color: #E8C9A0 !important;
+}
+.admin-dark #page-admin .gen-opt-lbl { color: #E8C9A0; }
 
 /* ai-panel é sempre escuro — neutralizar qualquer override do dark mode */
 .admin-dark #page-admin .ai-panel { background: #1E0A03 !important; }
@@ -823,7 +877,7 @@ img { max-width: 100%; display: block; }
 .btn-sm-primary {
   background: var(--teal-dark); color: #fff; border: none;
   padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 500;
-  transition: background .15s;
+  transition: background .15s; cursor: pointer;
 }
 .btn-sm-primary:hover { background: var(--teal); }
 .admin-content { padding: 24px 28px; flex: 1; }
@@ -1166,7 +1220,7 @@ img { max-width: 100%; display: block; }
   padding: 10px 12px; cursor: pointer; transition: all .15s;
 }
 .gen-opt:hover { border-color: var(--teal-light); }
-.gen-opt.sel { border-color: var(--teal-dark); background: #E8F3F3; }
+.gen-opt.sel { border-color: var(--teal-dark); background: #E8F3F3; color: #1E0A03; }
 .gen-opt-lbl { font-size: 13px; font-weight: 500; color: var(--teal-dark); margin-bottom: 2px; }
 .gen-opt-desc { font-size: 11px; color: var(--muted); }
 .gen-textarea { width: 100%; border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; font-size: 13px; font-family: inherit; resize: none; margin-bottom: 10px; outline: none; }
