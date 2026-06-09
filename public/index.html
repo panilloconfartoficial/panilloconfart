@@ -136,6 +136,119 @@
 }
 
 /* ═══════════════════════════════════════════════════════
+   DARK MODE — ADMIN ONLY
+   Aplicado via body.admin-dark em #page-admin e modais
+═══════════════════════════════════════════════════════ */
+.admin-dark #page-admin,
+.admin-dark .admin-sidebar {
+  --white:        #1E0E07;
+  --cream:        #2A1208;
+  --cream-dark:   #381808;
+  --text:         #F0E0D0;
+  --text-mid:     #D4B89A;
+  --muted:        #9A7A62;
+  --border:       rgba(255,255,255,0.07);
+  --border-mid:   rgba(255,255,255,0.12);
+  --teal-darkest: #F5EAD8;
+  --teal-dark:    #E8C9A0;
+  --teal:         #C47B35;
+  --teal-light:   #A85C1A;
+  --gold-dark:    #E8C9A0;
+  --gold:         #C47B35;
+  --gold-light:   #E8C9A0;
+  --gold-pale:    #2A1208;
+  --shadow:       0 4px 24px rgba(0,0,0,0.4);
+}
+
+/* Superfícies específicas dark */
+.admin-dark #page-admin .admin-main    { background: #160900; }
+.admin-dark #page-admin .admin-topbar  { background: #1E0E07; border-bottom-color: rgba(255,255,255,0.07); }
+.admin-dark #page-admin .admin-card    { background: #2A1208; border-color: rgba(255,255,255,0.08); }
+.admin-dark #page-admin .kpi-card      { background: #2A1208; border-color: rgba(255,255,255,0.08); }
+.admin-dark #page-admin .tab-row       { background: #2A1208; border-color: rgba(255,255,255,0.08); }
+.admin-dark #page-admin .orders-table th,
+.admin-dark #page-admin .clients-table th { background: #1E0E07; color: #9A7A62; border-bottom-color: rgba(255,255,255,0.07); }
+.admin-dark #page-admin .orders-table td,
+.admin-dark #page-admin .clients-table td { border-bottom-color: rgba(255,255,255,0.06); color: #D4B89A; }
+.admin-dark #page-admin .orders-table tr:hover td,
+.admin-dark #page-admin .clients-table tr:hover td { background: rgba(255,255,255,0.04); }
+.admin-dark #page-admin .fi,
+.admin-dark #page-admin .orders-search,
+.admin-dark #page-admin .clients-search,
+.admin-dark #page-admin .status-select,
+.admin-dark #page-admin select,
+.admin-dark #page-admin input[type="text"],
+.admin-dark #page-admin input[type="number"],
+.admin-dark #page-admin input[type="tel"],
+.admin-dark #page-admin input[type="url"],
+.admin-dark #page-admin input[type="date"],
+.admin-dark #page-admin textarea,
+.admin-dark #page-admin .gen-textarea  {
+  background: #1E0E07;
+  color: #F0E0D0;
+  border-color: rgba(255,255,255,0.12);
+}
+.admin-dark #page-admin .client-field input,
+.admin-dark #page-admin .client-field select,
+.admin-dark #page-admin .client-field textarea {
+  background: #1E0E07;
+  color: #F0E0D0;
+  border-color: rgba(255,255,255,0.12);
+}
+.admin-dark #page-admin .btn-sm-outline {
+  background: #2A1208;
+  border-color: rgba(255,255,255,0.15);
+  color: #E8C9A0;
+}
+.admin-dark #page-admin .btn-sm-outline:hover { background: #381808; }
+.admin-dark #page-admin .result-box    { background: #2A1208; }
+.admin-dark #page-admin .dep-admin-card { background: #2A1208; border-color: rgba(255,255,255,0.08); }
+.admin-dark #page-admin .dep-reply     { background: #1E0E07; }
+.admin-dark #page-admin .order-row     { border-bottom-color: rgba(255,255,255,0.06); }
+.admin-dark #page-admin .kpi-card.accent { border-top-color: #C47B35; }
+.admin-dark #page-admin .admin-page-title { color: #E8C9A0; }
+.admin-dark #page-admin .ac-title      { color: #E8C9A0; }
+.admin-dark #page-admin .kpi-val       { color: #E8C9A0; }
+.admin-dark #page-admin .kpi-lbl       { color: #9A7A62; }
+
+/* Sidebar dark — fundo escuro profundo */
+.admin-dark .admin-sidebar {
+  background: #0F0500 !important;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.admin-dark .admin-sidebar .sb-logo-c  { background: #1E0E07 !important; border-color: rgba(255,255,255,0.1) !important; }
+.admin-dark .admin-sidebar .sb-brand   { color: #E8C9A0 !important; }
+.admin-dark .admin-sidebar .sb-section { color: rgba(255,255,255,0.3) !important; }
+.admin-dark .admin-sidebar .sb-label   { color: rgba(255,255,255,0.5) !important; }
+.admin-dark .admin-sidebar .sb-icon    { color: rgba(255,255,255,0.4) !important; }
+.admin-dark .admin-sidebar .sb-item:hover { background: rgba(255,255,255,0.04) !important; }
+.admin-dark .admin-sidebar .sb-item.active { background: rgba(196,123,53,0.15) !important; border-left-color: #C47B35 !important; }
+.admin-dark .admin-sidebar .sb-item.active .sb-label { color: #E8C9A0 !important; }
+.admin-dark .admin-sidebar .sb-item.active .sb-icon  { color: #C47B35 !important; }
+.admin-dark .admin-sidebar .sb-exit span { color: rgba(255,255,255,0.35) !important; }
+.admin-dark .admin-sidebar .sb-exit:hover span { color: #E8C9A0 !important; }
+.admin-dark .admin-sidebar .sb-logo-c img { filter: brightness(0.9); }
+
+/* Botão dark mode na topbar */
+#dark-toggle-btn {
+  background: none;
+  border: 1.5px solid var(--border-mid);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  transition: background .15s, border-color .15s;
+  color: var(--text-mid);
+}
+#dark-toggle-btn:hover { background: var(--cream-dark); }
+.admin-dark #page-admin #dark-toggle-btn {
+  background: #2A1208;
+  border-color: rgba(255,255,255,0.15);
+  color: #E8C9A0;
+}
+
+/* ═══════════════════════════════════════════════════════
    RESET / BASE
 ═══════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2370,9 +2483,8 @@ img { max-width: 100%; display: block; }
           <div class="admin-page-title">Dashboard</div>
         </div>
         <div class="topbar-right">
+          <button id="dark-toggle-btn" onclick="toggleAdminDark()" title="Alternar modo escuro">🌙</button>
           <button class="btn-sm-outline" onclick="showAdminSection('config',this)" style="font-size:12px;">⚙️ Configurações</button>
-        </div>
-        <div class="topbar-right">
           <button class="btn-sm-outline" id="period-btn" onclick="togglePeriod()">Este mês</button>
         </div>
       </div>
@@ -3725,7 +3837,11 @@ window.addEventListener("firebase-ready", () => {
   Promise.all([
     new Promise(r => setTimeout(r, 1200)) // aguarda loadOrders e loadStock acima
   ]).then(() => {
-    reconcileStock();
+    // Só reconcilia se realmente existem pedidos sem desconto — evita leituras desnecessárias
+    const needsReconcile = (allOrders||[]).some(o =>
+      o.tipo === "pronta-entrega" && o.status === "entregue" && !o._stockDecremented
+    );
+    if (needsReconcile) reconcileStock();
     // Load clients for birthday alerts (background)
     setTimeout(async () => {
       try {
@@ -3736,6 +3852,10 @@ window.addEventListener("firebase-ready", () => {
     }, 800);
   });
 });
+
+function escHtml(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
 
 async function fbAdd(col, data) {
   return FB.addDoc(FB.collection(db, col), { ...data, createdAt: FB.serverTimestamp() });
@@ -5251,8 +5371,8 @@ async function renderClients() {
             <div style="display:flex;align-items:center;gap:8px;">
               <div class="client-av" style="flex-shrink:0;">${(c.nome||"?").substring(0,2).toUpperCase()}</div>
               <div>
-                <div class="client-name">${c.nome||"—"}</div>
-                ${c.obs ? `<div style="font-size:10px;color:var(--muted);">${c.obs.substring(0,35)}…</div>` : ""}
+                <div class="client-name">${escHtml(c.nome||"—")}</div>
+                ${c.obs ? `<div style="font-size:10px;color:var(--muted);">${escHtml(c.obs.substring(0,35))}…</div>` : ""}
               </div>
             </div>
           </td>
@@ -7429,8 +7549,20 @@ function applyLogo(src) {
   }
 }
 
-function loadConfig() {
-  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+async function loadConfig() {
+  let cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  // Sincroniza com Firebase (fonte de verdade entre dispositivos)
+  if (db && FB) {
+    try {
+      const docs = await fbGet("appConfig");
+      if (docs.length > 0) {
+        const remote = docs[0];
+        // Merge: Firebase prevalece exceto para campos que o usuário pode ter alterado localmente agora
+        cfg = { ...cfg, ...remote };
+        localStorage.setItem("panillo-config", JSON.stringify(cfg));
+      }
+    } catch(e) { /* usa localStorage como fallback */ }
+  }
   const a1   = cfg.addr1 || "";
   const a2   = cfg.addr2 || "";
   const logo = cfg.logo  || LOGO_BASE64;
@@ -7482,7 +7614,7 @@ function _populatePickupPeriods(cfg) {
     periods.map(p => `<option>${p}</option>`).join("");
 }
 
-function saveConfig() {
+async function saveConfig() {
   const existing = JSON.parse(localStorage.getItem("panillo-config") || "{}");
   const periods = (document.getElementById("cfg-periods")?.value || "")
     .split("\n").map(s=>s.trim()).filter(Boolean);
@@ -7497,9 +7629,18 @@ function saveConfig() {
     capacity: document.getElementById("cfg-capacity")?.value        || existing.capacity || "",
     coupons:  existing.coupons || [],
   };
+  // Salva localmente E no Firebase para persistir entre dispositivos
   localStorage.setItem("panillo-config", JSON.stringify(cfg));
+  try {
+    const docs = await fbGet("appConfig");
+    if (docs.length > 0) {
+      await fbUpdate("appConfig", docs[0].id, { ...cfg, updatedAt: FB.serverTimestamp() });
+    } else {
+      await fbAdd("appConfig", cfg);
+    }
+  } catch(e) { console.warn("Config: Firebase indisponível, salvo apenas localmente.", e); }
   loadConfig();
-  loadDashboard(); // recalculate with new overhead
+  loadDashboard();
   showToast("Configurações salvas!");
 }
 
@@ -7522,7 +7663,7 @@ function renderCouponsList() {
     </div>`).join("");
 }
 
-function addCoupon() {
+async function addCoupon() {
   const code = (document.getElementById("new-coupon-code")?.value || "").trim().toUpperCase();
   const pct  = parseInt(document.getElementById("new-coupon-pct")?.value || "0");
   if (!code || !pct || pct < 1 || pct > 100) { showToast("Preencha código e % válidos!"); return; }
@@ -7531,24 +7672,43 @@ function addCoupon() {
   if (cfg.coupons.find(c=>c.code===code)) { showToast("Cupom já existe!"); return; }
   cfg.coupons.push({ code, pct });
   localStorage.setItem("panillo-config", JSON.stringify(cfg));
+  try {
+    const docs = await fbGet("appConfig");
+    if (docs.length > 0) await fbUpdate("appConfig", docs[0].id, { coupons: cfg.coupons });
+    else await fbAdd("appConfig", { coupons: cfg.coupons });
+  } catch(e) { console.warn("Cupom: Firebase indisponível.", e); }
   document.getElementById("new-coupon-code").value = "";
   document.getElementById("new-coupon-pct").value  = "";
   renderCouponsList();
   showToast(`Cupom ${code} criado!`);
 }
 
-function removeCoupon(idx) {
+async function removeCoupon(idx) {
   const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
   cfg.coupons = (cfg.coupons||[]).filter((_,i)=>i!==idx);
   localStorage.setItem("panillo-config", JSON.stringify(cfg));
+  try {
+    const docs = await fbGet("appConfig");
+    if (docs.length > 0) await fbUpdate("appConfig", docs[0].id, { coupons: cfg.coupons });
+  } catch(e) { console.warn("Cupom remove: Firebase indisponível.", e); }
   renderCouponsList();
   showToast("Cupom removido!");
 }
 
-function applyCoupon() {
+async function applyCoupon() {
   const code = (document.getElementById("coupon-input")?.value || "").trim().toUpperCase();
   if (!code) return;
-  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  let cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  // Se não tem cupons locais, tenta buscar do Firebase
+  if (!(cfg.coupons||[]).length && db && FB) {
+    try {
+      const docs = await fbGet("appConfig");
+      if (docs.length > 0 && docs[0].coupons) {
+        cfg.coupons = docs[0].coupons;
+        localStorage.setItem("panillo-config", JSON.stringify({...cfg}));
+      }
+    } catch(e) {}
+  }
   const found = (cfg.coupons||[]).find(c=>c.code===code);
   const wrap  = document.getElementById("coupon-badge-wrap");
   const discRow = document.getElementById("discount-row");
@@ -7723,6 +7883,7 @@ async function sendSupport() {
   histEl.innerHTML += `<div class="support-bubble user"><strong>Você:</strong> ${q}</div>`;
   histEl.scrollTop = histEl.scrollHeight;
   _supportHistory.push({ role:"user", content: q });
+  if (_supportHistory.length > 12) _supportHistory.splice(0, 2); // max 6 trocas
 
   const cfg = JSON.parse(localStorage.getItem("panillo-config")||"{}");
   const addr = cfg.addr1 || "configure no painel admin";
@@ -8264,6 +8425,7 @@ function toggleAdminSidebar() {
 updateCartUI();
 restoreClientSession();
 document.addEventListener("DOMContentLoaded", () => {
+  initAdminDark();
   // Sidebar mobile: fecha ao clicar em item
   document.querySelectorAll(".sb-item").forEach(item => {
     item.addEventListener("click", () => {
@@ -8712,27 +8874,78 @@ function vpAddItem() {
 function vpRenderItems() {
   const container = document.getElementById("vp-items");
   if (!container) return;
-  container.innerHTML = _vpItems.map((item, i) => `
-    <div style="display:flex;gap:8px;align-items:center;">
-      <select onchange="vpSetProd(${i},this.value)" style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--text);background:#fff;">
-        <option value="">Selecionar produto...</option>
-        ${allProducts.filter(p=>p.ativo!==false).map(p => `<option value="${p.id}" ${item.prodId===p.id?'selected':''}>${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")}</option>`).join("")}
-      </select>
-      <input type="number" min="1" value="${item.qty}" onchange="vpSetQty(${i},this.value)" style="width:58px;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;text-align:center;">
-      <button onclick="vpRemoveItem(${i})" style="background:none;border:none;color:#993C1D;cursor:pointer;font-size:18px;line-height:1;">×</button>
-    </div>`).join("");
+  container.innerHTML = _vpItems.map((item, i) => {
+    // Estoque disponível para cada linha
+    const stockInfo = allProducts.filter(p => p.ativo !== false).map(p => {
+      const s = allStock[p.id];
+      const qty = s && s.ativo ? (s.qty || 0) : null; // null = sem controle de estoque
+      const esgotado = qty !== null && qty === 0;
+      const label = qty === null
+        ? `${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")} `
+        : esgotado
+          ? `${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")}  ⚠ ESGOTADO`
+          : `${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")}  (${qty} em estoque)`;
+      return { p, qty, esgotado, label };
+    });
+
+    // Cor de borda da linha se produto selecionado estiver zerado
+    const selInfo = item.prodId ? stockInfo.find(x => x.p.id === item.prodId) : null;
+    const rowBorder = selInfo && selInfo.esgotado
+      ? "1.5px solid #D9534F"
+      : "1.5px solid var(--border)";
+    const maxQty = selInfo && selInfo.qty !== null ? selInfo.qty : 999;
+
+    return `<div style="display:flex;gap:8px;align-items:flex-start;flex-direction:column;margin-bottom:4px;">
+      <div style="display:flex;gap:8px;align-items:center;width:100%;">
+        <select onchange="vpSetProd(${i},this.value)" style="flex:1;padding:8px 10px;border:${rowBorder};border-radius:8px;font-size:12px;color:var(--text);background:#fff;">
+          <option value="">Selecionar produto...</option>
+          ${stockInfo.map(({ p, esgotado, label }) =>
+            `<option value="${p.id}" ${item.prodId===p.id?'selected':''} ${esgotado?'style="color:#999;"':''}>${label}</option>`
+          ).join("")}
+        </select>
+        <input type="number" min="1" max="${maxQty}" value="${item.qty}"
+          onchange="vpSetQty(${i},this.value)"
+          style="width:58px;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;text-align:center;">
+        <button onclick="vpRemoveItem(${i})" style="background:none;border:none;color:#993C1D;cursor:pointer;font-size:18px;line-height:1;">×</button>
+      </div>
+      ${selInfo && selInfo.esgotado
+        ? `<div style="font-size:11px;color:#D9534F;font-weight:500;padding-left:2px;">⚠ Este produto está sem estoque. Remova ou aguarde reposição.</div>`
+        : selInfo && selInfo.qty !== null && item.qty > selInfo.qty
+          ? `<div style="font-size:11px;color:#C47B35;font-weight:500;padding-left:2px;">⚠ Quantidade pedida (${item.qty}) maior que o estoque disponível (${selInfo.qty}).</div>`
+          : ""}
+    </div>`;
+  }).join("");
   vpCalcTotal();
 }
 
 function vpSetProd(i, prodId) {
   const p = allProducts.find(x => x.id === prodId);
-  if (p) { _vpItems[i].prodId = p.id; _vpItems[i].nome = p.nome; _vpItems[i].preco = Number(p.preco||0); }
-  vpCalcTotal();
+  if (p) {
+    _vpItems[i].prodId = p.id;
+    _vpItems[i].nome   = p.nome;
+    _vpItems[i].preco  = Number(p.preco||0);
+    // Ajusta qty para não ultrapassar o estoque disponível
+    const s = allStock[p.id];
+    const maxQty = s && s.ativo ? (s.qty || 0) : 999;
+    if (maxQty > 0) {
+      _vpItems[i].qty = Math.min(_vpItems[i].qty, maxQty);
+    }
+  }
+  vpRenderItems();
 }
 
 function vpSetQty(i, v) {
-  _vpItems[i].qty = Math.max(1, parseInt(v)||1);
-  vpCalcTotal();
+  const prodId = _vpItems[i]?.prodId;
+  const s = prodId ? allStock[prodId] : null;
+  const maxQty = s && s.ativo ? (s.qty || 0) : 999;
+  const requested = Math.max(1, parseInt(v)||1);
+  if (maxQty > 0 && requested > maxQty) {
+    _vpItems[i].qty = maxQty;
+    showToast(`Estoque máximo: ${maxQty} unidade(s)`);
+  } else {
+    _vpItems[i].qty = requested;
+  }
+  vpRenderItems();
 }
 
 function vpRemoveItem(i) {
@@ -8785,6 +8998,29 @@ function vpCalcTotal() {
 async function submitVendaPresencial() {
   const items = _vpItems.filter(i => i.prodId);
   if (!items.length) { showToast("Adicione ao menos um produto", "error"); return; }
+
+  // ── Validação de estoque antes de registrar ──────────────
+  const semEstoque = [];
+  const excessoEstoque = [];
+  for (const item of items) {
+    const s = allStock[item.prodId];
+    if (!s || !s.ativo) continue; // produto sem controle de estoque — permite
+    const disponivel = s.qty || 0;
+    if (disponivel === 0) {
+      semEstoque.push(item.nome);
+    } else if (item.qty > disponivel) {
+      excessoEstoque.push(`${item.nome} (pedido: ${item.qty}, disponível: ${disponivel})`);
+    }
+  }
+  if (semEstoque.length) {
+    showToast(`Estoque zerado: ${semEstoque.join(", ")}. Remova o produto ou atualize o estoque.`, "error");
+    return;
+  }
+  if (excessoEstoque.length) {
+    showToast(`Quantidade maior que o estoque: ${excessoEstoque.join(" | ")}`, "error");
+    return;
+  }
+
   const { subtotal, descontoValor, total } = vpCalcTotal();
   const pagamento = document.getElementById("vp-pagamento").value;
   const obs = document.getElementById("vp-obs").value;
@@ -8796,7 +9032,7 @@ async function submitVendaPresencial() {
     status: "entregue",
     cliente: _vpClient ? { nome: _vpClient.nome, wpp: _vpClient.wpp } : { nome: "Venda Presencial", wpp: "" },
     clienteId: _vpClient?.id || null,
-    itens: items.map(i => ({ nome: i.nome, qty: i.qty, preco: i.preco })),
+    itens: items.map(i => ({ prodId: i.prodId||null, nome: i.nome, qty: i.qty, preco: i.preco })),
     subtotal,
     desconto: descontoValor,
     descontoTipo: window._vpDescontoTipo || "R$",
@@ -9728,6 +9964,24 @@ renderClients = async function() {
 
 <script>
 // ═══════════════════════════════════════════════════
+//  DARK MODE ADMIN
+// ═══════════════════════════════════════════════════
+function toggleAdminDark() {
+  const isDark = document.body.classList.toggle("admin-dark");
+  localStorage.setItem("panillo-dark", isDark ? "1" : "0");
+  const btn = document.getElementById("dark-toggle-btn");
+  if (btn) btn.textContent = isDark ? "☀️" : "🌙";
+}
+
+function initAdminDark() {
+  if (localStorage.getItem("panillo-dark") === "1") {
+    document.body.classList.add("admin-dark");
+    const btn = document.getElementById("dark-toggle-btn");
+    if (btn) btn.textContent = "☀️";
+  }
+}
+
+// ═══════════════════════════════════════════════════
 //  DEPOIMENTOS — LOJA + ADMIN
 // ═══════════════════════════════════════════════════
 let _avalStar = 0;
@@ -9750,8 +10004,8 @@ async function loadDepoimentos() {
       const resposta = d.resposta ? `<div class="dep-reply"><div class="dep-reply-lbl">Resposta da Panillo</div><div class="dep-reply-txt">${d.resposta}</div></div>` : "";
       return `<div class="dep-card">
         <div class="dep-stars">${estrelas}</div>
-        <div class="dep-text">"${d.texto}"</div>
-        <div class="dep-name">${d.clienteNome || "Cliente"}</div>
+        <div class="dep-text">"${escHtml(d.texto)}"</div>
+        <div class="dep-name">${escHtml(d.clienteNome || "Cliente")}</div>
         ${resposta}
       </div>`;
     }).join("");
@@ -9816,6 +10070,16 @@ async function submitAvaliacao() {
   btn.textContent = "Publicando..."; btn.disabled = true;
 
   try {
+    // Bloquear duplicata — mesmo WhatsApp só pode ter 1 avaliação
+    const wppNorm = (saved.wpp||"").replace(/\D/g,"");
+    const existentes = await fbGet("depoimentos");
+    const jaAvaliou = existentes.some(d => (d.clienteWpp||"").replace(/\D/g,"") === wppNorm && wppNorm);
+    if (jaAvaliou) {
+      errEl.textContent = "Você já enviou uma avaliação. Agradecemos seu feedback! 💛";
+      errEl.style.display = "block";
+      btn.textContent = "Publicar avaliação"; btn.disabled = false;
+      return;
+    }
     await fbAdd("depoimentos", {
       clienteNome: saved.nome || "Cliente",
       clienteWpp:  (saved.wpp||"").replace(/\D/g,""),
@@ -9878,15 +10142,15 @@ async function renderDepoimentosAdmin() {
       const ocultoBtnLabel = d.oculto ? "👁 Mostrar" : "🙈 Ocultar";
       const wppBtn = d.clienteWpp
         ? `<a href="https://wa.me/${d.clienteWpp}" target="_blank" style="background:none;border:1.5px solid #25D366;color:#128C7E;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px;"><i class="ti ti-brand-whatsapp" style="font-size:13px;"></i> WhatsApp</a>` : "";
-      const respostaAtual = d.resposta || "";
+      const respostaAtual = escHtml(d.resposta || "");
       const respostaPreview = respostaAtual ? `<div class="dep-reply" style="margin-top:10px;"><div class="dep-reply-lbl">Sua resposta</div><div class="dep-reply-txt">${respostaAtual}</div></div>` : "";
       return `<div class="dep-admin-card" id="dep-card-${d.id}" style="${d.oculto ? 'opacity:.55;' : ''}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
           <div style="flex:1;min-width:0;">
             <div class="dep-admin-stars">${estrelas}</div>
-            <div class="dep-admin-texto">"${d.texto}"</div>
+            <div class="dep-admin-texto">"${escHtml(d.texto)}"</div>
             <div class="dep-admin-meta">
-              <strong>${d.clienteNome||"Cliente"}</strong>
+              <strong>${escHtml(d.clienteNome||"Cliente")}</strong>
               ${d.clienteWpp ? ' · ' + d.clienteWpp : ''}
               · ${data}
               ${d.oculto ? ' · <span style="color:#993C1D;font-weight:600;">OCULTO</span>' : ''}
