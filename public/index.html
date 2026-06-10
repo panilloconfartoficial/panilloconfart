@@ -176,7 +176,6 @@
 .admin-dark #page-admin .orders-search,
 .admin-dark #page-admin .clients-search,
 .admin-dark #page-admin .status-select,
-.admin-dark #page-admin select { color: #F0DEC8 !important; }
 .admin-dark #page-admin select,
 .admin-dark #page-admin input[type="text"],
 .admin-dark #page-admin input[type="number"],
@@ -198,39 +197,10 @@
 }
 .admin-dark #page-admin .btn-sm-outline {
   background: #2A1208;
-  border-color: rgba(255,255,255,0.2);
-  color: #E8C9A0 !important;
+  border-color: rgba(255,255,255,0.15);
+  color: #E8C9A0;
 }
-.admin-dark #page-admin .btn-sm-outline:hover { background: #381808; color: #F0DEC8 !important; }
-
-/* Botões primários no dark: fundo caramelo claro → texto escuro para legibilidade */
-.admin-dark #page-admin .btn-sm-primary {
-  background: #C47B35;
-  color: #1E0A03 !important;
-  font-weight: 600;
-}
-.admin-dark #page-admin .btn-sm-primary:hover { background: #E8C9A0; color: #1E0A03 !important; }
-
-/* Botões de salvar inline com background claro */
-.admin-dark #page-admin button[style*="background:var(--teal-dark)"],
-.admin-dark #page-admin button[style*="background: var(--teal-dark)"] {
-  color: #1E0A03 !important;
-}
-
-/* gen-btn (Gerar com IA) */
-.admin-dark #page-admin .gen-btn {
-  background: #C47B35;
-  color: #1E0A03 !important;
-  font-weight: 600;
-}
-.admin-dark #page-admin .gen-btn:hover { background: #E8C9A0; color: #1E0A03 !important; }
-
-/* Qualquer botão inline cujo fundo virar claro no dark */
-.admin-dark #page-admin .pay-confirm-btn {
-  background: #2A1208;
-  color: #E8C9A0 !important;
-  border-color: rgba(255,255,255,0.1);
-}
+.admin-dark #page-admin .btn-sm-outline:hover { background: #381808; }
 .admin-dark #page-admin .result-box    { background: #2A1208; }
 .admin-dark #page-admin .dep-admin-card { background: #2A1208; border-color: rgba(255,255,255,0.08); }
 .admin-dark #page-admin .dep-reply     { background: #1E0E07; }
@@ -259,33 +229,111 @@
 .admin-dark .admin-sidebar .sb-exit:hover span { color: #E8C9A0 !important; }
 .admin-dark .admin-sidebar .sb-logo-c img { filter: brightness(0.9); }
 
-/* Botões inline com var(--teal) ou var(--teal-dark) como fundo ficam claros no dark */
-.admin-dark #page-admin button[style*="background:var(--teal)"],
-.admin-dark #page-admin button[style*="background: var(--teal)"] {
-  color: #1E0A03 !important;
-  font-weight: 600;
+/* ═══════════════════════════════════════════════════════
+   DARK MODE — MODAIS E OVERLAYS
+   Cobre todos os modais que usam background:#fff hardcoded
+   nos inline styles. Usa !important pois inline styles têm
+   maior especificidade que classes CSS.
+═══════════════════════════════════════════════════════ */
+
+/* Regra base: qualquer elemento com fundo branco hardcoded dentro de .admin-dark */
+.admin-dark [style*="background:#fff"],
+.admin-dark [style*="background: #fff"],
+.admin-dark [style*="background:white"] {
+  background: #2A1208 !important;
+  color: #F0E0D0 !important;
 }
 
-/* Exportar CSV e filtros — garantir legibilidade */
-.admin-dark #page-admin .orders-search,
-.admin-dark #page-admin .clients-search {
-  color: #F0DEC8 !important;
+/* Inputs/selects/textareas filhos desses elementos */
+.admin-dark [style*="background:#fff"] input,
+.admin-dark [style*="background:#fff"] select,
+.admin-dark [style*="background:#fff"] textarea,
+.admin-dark [style*="background: #fff"] input,
+.admin-dark [style*="background: #fff"] select,
+.admin-dark [style*="background: #fff"] textarea {
   background: #1E0E07 !important;
+  color: #F0E0D0 !important;
+  border-color: rgba(255,255,255,0.12) !important;
 }
-.admin-dark #page-admin .orders-search::placeholder,
-.admin-dark #page-admin .clients-search::placeholder { color: rgba(255,255,255,0.3); }
+.admin-dark [style*="background:#fff"] label,
+.admin-dark [style*="background: #fff"] label { color: #D4B89A !important; }
 
-/* gen-opt selecionado no dark mode — fundo claro exige texto escuro */
-.admin-dark #page-admin .gen-opt.sel {
-  background: rgba(196,123,53,0.15) !important;
-  border-color: #C47B35 !important;
+/* Dropdowns / autocomplete (têm box-shadow + background:#fff) */
+.admin-dark #vp-client-list {
+  background: #1E0E07 !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #F0E0D0 !important;
+}
+.admin-dark #vp-client-list > div { color: #F0E0D0 !important; }
+.admin-dark #vp-client-list > div:hover { background: rgba(255,255,255,0.06) !important; }
+
+/* Prod / Ing modals (usam classes CSS, não inline) */
+.admin-dark .prod-modal {
+  background: #2A1208 !important;
+  color: #F0E0D0 !important;
+}
+.admin-dark .pm-title  { color: #E8C9A0 !important; }
+.admin-dark .pm-header { border-bottom-color: rgba(255,255,255,0.08) !important; }
+.admin-dark .pm-footer { border-top-color: rgba(255,255,255,0.08) !important; background: #2A1208 !important; }
+.admin-dark .pm-body   { background: #2A1208 !important; color: #F0E0D0 !important; }
+.admin-dark .prod-modal input,
+.admin-dark .prod-modal select,
+.admin-dark .prod-modal textarea {
+  background: #1E0E07 !important;
+  color: #F0E0D0 !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+.admin-dark .prod-modal label { color: #D4B89A !important; }
+.admin-dark .photo-zone { border-color: rgba(255,255,255,0.15) !important; color: #9A7A62 !important; background: #1E0E07 !important; }
+
+/* Client detail modal */
+.admin-dark .client-detail-box {
+  background: #2A1208 !important;
+  color: #F0E0D0 !important;
+}
+.admin-dark .client-detail-box h3,
+.admin-dark .client-detail-box h4 { color: #E8C9A0 !important; }
+
+/* Avaliação modal */
+.admin-dark .aval-box {
+  background: #2A1208 !important;
+  color: #F0E0D0 !important;
+}
+
+/* Fiado auth card */
+.admin-dark .fiado-auth-card {
+  background: #2A1208 !important;
+  color: #F0E0D0 !important;
+}
+.admin-dark .fiado-auth-card input,
+.admin-dark .fiado-auth-card select {
+  background: #1E0E07 !important;
+  color: #F0E0D0 !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+.admin-dark .fiado-auth-card h3,
+.admin-dark .fiado-auth-card p,
+.admin-dark .fiado-auth-card label { color: #D4B89A !important; }
+
+/* Seção Total (background:var(--cream) no VP modal) */
+.admin-dark [style*="background:var(--cream)"],
+.admin-dark [style*="background: var(--cream)"] {
+  background: #381808 !important;
+}
+
+/* Portal tabs */
+.admin-dark .portal-tab.active {
+  background: #2A1208 !important;
   color: #E8C9A0 !important;
+  box-shadow: none !important;
 }
-.admin-dark #page-admin .gen-opt-lbl { color: #E8C9A0; }
 
-/* ai-panel é sempre escuro — neutralizar qualquer override do dark mode */
-.admin-dark #page-admin .ai-panel { background: #1E0A03 !important; }
-.admin-dark #page-admin .ai-input { background: rgba(0,0,0,0.35) !important; color: #F0DEC8 !important; border-color: rgba(255,255,255,0.12) !important; }
+/* Selects avulsos fora do #page-admin (hist, dep, fiado desc etc.) */
+.admin-dark select { background: #1E0E07 !important; color: #F0E0D0 !important; border-color: rgba(255,255,255,0.12) !important; }
+
+/* Botão toggle % desconto VP (começa como fundo branco) */
+.admin-dark #vp-desc-tipo-P { background: #1E0E07 !important; color: #9A7A62 !important; }
+.admin-dark #vp-desc-tipo-R { background: #C47B35 !important; color: #fff !important; }
 
 /* Botão dark mode na topbar */
 #dark-toggle-btn {
@@ -877,7 +925,7 @@ img { max-width: 100%; display: block; }
 .btn-sm-primary {
   background: var(--teal-dark); color: #fff; border: none;
   padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 500;
-  transition: background .15s; cursor: pointer;
+  transition: background .15s;
 }
 .btn-sm-primary:hover { background: var(--teal); }
 .admin-content { padding: 24px 28px; flex: 1; }
@@ -897,46 +945,43 @@ img { max-width: 100%; display: block; }
 
 /* ─── AI PANEL ─── */
 .ai-panel {
-  /* Sempre escuro — independente do tema claro/dark */
-  background: #1E0A03; border-radius: 14px; padding: 20px; margin-bottom: 20px;
+  background: var(--teal-dark); border-radius: 14px; padding: 20px; margin-bottom: 20px;
 }
 .ai-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-.ai-dot { width: 8px; height: 8px; border-radius: 50%; background: #C47B35; flex-shrink: 0; }
-.ai-title { color: #F0DEC8; font-size: 15px; font-weight: 500; }
+.ai-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold-light); flex-shrink: 0; }
+.ai-title { color: #fff; font-size: 15px; font-weight: 500; }
 .ai-badge {
-  background: rgba(196,123,53,0.2); color: #C47B35;
-  border: 1px solid rgba(196,123,53,0.35); font-size: 10px;
+  background: rgba(200,144,42,0.2); color: var(--gold-light);
+  border: 1px solid rgba(200,144,42,0.3); font-size: 10px;
   padding: 2px 9px; border-radius: 8px; letter-spacing: 0.5px;
 }
 .ai-insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
 .ai-insight {
-  background: rgba(255,255,255,0.05); border-radius: 10px; padding: 12px;
-  border: 0.5px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;
 }
 .ai-insight-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 500; }
-.ai-insight.pos .ai-insight-type { color: #7ECDB5; }
-.ai-insight.neg .ai-insight-type { color: #F5A891; }
-.ai-insight-text { font-size: 12px; color: rgba(255,255,255,0.82); line-height: 1.6; }
+.ai-insight.pos .ai-insight-type { color: #9FE1CB; }
+.ai-insight.neg .ai-insight-type { color: #F5C4B3; }
+.ai-insight-text { font-size: 12px; color: rgba(255,255,255,0.8); line-height: 1.55; }
 .ai-input-row { display: flex; gap: 8px; }
 .ai-input {
-  flex: 1; background: rgba(0,0,0,0.35);
+  flex: 1; background: rgba(255,255,255,0.08);
   border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
-  padding: 9px 13px; color: #F0DEC8; font-size: 13px; outline: none;
+  padding: 9px 13px; color: #fff; font-size: 13px; outline: none;
   transition: border-color .2s;
 }
-.ai-input:focus { border-color: rgba(196,123,53,0.5); }
-.ai-input::placeholder { color: rgba(255,255,255,0.3); }
+.ai-input:focus { border-color: rgba(255,255,255,0.3); }
+.ai-input::placeholder { color: rgba(255,255,255,0.35); }
 .ai-send {
-  background: #8B4513; color: #fff; border: none;
+  background: var(--gold); color: #fff; border: none;
   padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
-  transition: background .2s; cursor: pointer;
+  transition: background .2s;
 }
-.ai-send:hover { background: #6B2E0E; }
+.ai-send:hover { background: var(--gold-dark); }
 .ai-response { margin-top: 10px; }
 .ai-response-bubble {
-  background: rgba(0,0,0,0.25); border-radius: 10px;
-  padding: 12px 14px; font-size: 13px; color: rgba(255,255,255,0.88); line-height: 1.6;
-  border: 0.5px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.08); border-radius: 10px;
+  padding: 12px 14px; font-size: 13px; color: rgba(255,255,255,0.85); line-height: 1.6;
 }
 
 /* ─── TWO COL ─── */
@@ -1220,7 +1265,7 @@ img { max-width: 100%; display: block; }
   padding: 10px 12px; cursor: pointer; transition: all .15s;
 }
 .gen-opt:hover { border-color: var(--teal-light); }
-.gen-opt.sel { border-color: var(--teal-dark); background: #E8F3F3; color: #1E0A03; }
+.gen-opt.sel { border-color: var(--teal-dark); background: #E8F3F3; }
 .gen-opt-lbl { font-size: 13px; font-weight: 500; color: var(--teal-dark); margin-bottom: 2px; }
 .gen-opt-desc { font-size: 11px; color: var(--muted); }
 .gen-textarea { width: 100%; border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; font-size: 13px; font-family: inherit; resize: none; margin-bottom: 10px; outline: none; }
