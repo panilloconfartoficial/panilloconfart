@@ -2362,6 +2362,13 @@ img { max-width: 100%; display: block; }
           <input class="fi" id="pm-rend" type="number" placeholder="Ex: 12">
         </div>
       </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label class="fl" style="display:flex;align-items:center;gap:6px;">
+          Preço de revenda (R$)
+          <span style="font-size:10px;color:var(--muted);font-weight:400;">— deixe vazio se não tiver</span>
+        </label>
+        <input class="fi" id="pm-preco-revenda" type="number" step="0.01" placeholder="0,00 (opcional)">
+      </div>
       <!-- Campos exclusivos do COMBO -->
       <div id="combo-fields" class="hidden" style="background:var(--gold-pale);border:1px solid rgba(200,144,42,0.25);border-radius:12px;padding:16px;margin-bottom:14px;">
         <div style="font-size:13px;font-weight:500;color:var(--teal-dark);margin-bottom:12px;">🎁 Composição do Combo</div>
@@ -2617,6 +2624,12 @@ img { max-width: 100%; display: block; }
             <div class="kpi-delta" id="kpi-ticket-d"></div>
           </div>
         </div>
+        <!-- Revenda KPI strip -->
+        <div id="kpi-revenda-strip" style="display:none;background:rgba(15,74,74,0.06);border:1px solid rgba(15,74,74,0.15);border-radius:10px;padding:10px 16px;margin-bottom:16px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:700;color:var(--teal-dark);text-transform:uppercase;letter-spacing:.5px;">🔄 Revenda no período</span>
+          <span style="font-size:13px;color:var(--text);">Faturamento: <strong id="kpi-revenda-fat">R$ 0,00</strong></span>
+          <span style="font-size:13px;color:var(--text);">Pedidos: <strong id="kpi-revenda-ped">0</strong></span>
+        </div>
         <div class="ai-panel">
           <div class="ai-header">
             <div class="ai-dot"></div>
@@ -2835,6 +2848,17 @@ img { max-width: 100%; display: block; }
           <h3 style="font-size:17px;font-weight:700;color:var(--text);margin:0;">🛒 Venda Presencial</h3>
           <button onclick="closeVendaPresencial()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
         </div>
+        <!-- Tipo de venda -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button id="vp-btn-normal" onclick="vpSetTipo('normal')"
+            style="flex:1;padding:9px;border-radius:10px;border:1.5px solid var(--teal);background:var(--teal);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">
+            🏪 Normal
+          </button>
+          <button id="vp-btn-revenda" onclick="vpSetTipo('revenda')"
+            style="flex:1;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">
+            🔄 Revenda
+          </button>
+        </div>
         <!-- Client selector -->
         <div style="margin-bottom:16px;">
           <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;">Cliente (opcional)</label>
@@ -2937,6 +2961,12 @@ img { max-width: 100%; display: block; }
             <option value="todos">✅ Confirmação</option>
             <option value="pago">✓ Pagos</option>
             <option value="pendente">Confirmar pag.</option>
+          </select>
+          <select id="orders-filter-tipo" onchange="ordersPage=1;renderOrders()"
+            style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--text);cursor:pointer;">
+            <option value="todos">🔄 Tipo de venda</option>
+            <option value="normal">Normal</option>
+            <option value="revenda">Revenda</option>
           </select>
           <select id="orders-sort" onchange="ordersPage=1;renderOrders()"
             style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--text);cursor:pointer;">
@@ -4913,6 +4943,7 @@ function renderOrders() {
   const q = (document.getElementById("orders-search")?.value || "").toLowerCase();
   const filterPag  = document.getElementById("orders-filter-pag")?.value  || "todos";
   const filterConf = document.getElementById("orders-filter-conf")?.value || "todos";
+  const filterTipo = document.getElementById("orders-filter-tipo")?.value || "todos";
   const sort       = document.getElementById("orders-sort")?.value         || "data-desc";
 
   let list = orderFilterStatus === "todos" ? allOrders : allOrders.filter(o => o.status === orderFilterStatus);
@@ -4932,6 +4963,10 @@ function renderOrders() {
   // Filtro confirmação de pagamento
   if (filterConf === "pago")    list = list.filter(o => o.pagamentoConfirmado);
   if (filterConf === "pendente") list = list.filter(o => !o.pagamentoConfirmado);
+
+  // Filtro tipo de venda
+  if (filterTipo === "revenda") list = list.filter(o => o.tipoVenda === "revenda");
+  if (filterTipo === "normal")  list = list.filter(o => !o.tipoVenda || o.tipoVenda === "normal");
 
   // Ordenação
   list = [...list].sort((a, b) => {
@@ -4980,7 +5015,7 @@ function renderOrders() {
         </select>`;
         return `
         <tr style="${o.status==='cancelado'?'opacity:.6;':''}">
-          <td><strong>${o.cliente?.nome || "—"}</strong><br><span style="font-size:11px;color:var(--muted);">${o.cliente?.wpp || ""}</span></td>
+          <td><strong>${o.cliente?.nome || "—"}</strong>${o.tipoVenda === "revenda" ? ` <span style="font-size:9px;font-weight:700;background:#0F4A4A;color:#fff;padding:2px 6px;border-radius:6px;vertical-align:middle;">REVENDA</span>` : ""}<br><span style="font-size:11px;color:var(--muted);">${o.cliente?.wpp || ""}</span></td>
           <td style="font-size:12px;">${(o.itens||[]).map(i=>`${i.qty}× ${i.nome}`).join(", ")}</td>
           <td>${o.dataRetirada ? new Date(o.dataRetirada+"T12:00").toLocaleDateString("pt-BR") : "—"}<br><span style="font-size:11px;color:var(--muted);">${o.periodo||""}</span></td>
           <td>${paySelect}</td>
@@ -6291,6 +6326,7 @@ function openProdModal(id) {
       document.getElementById("pm-cat").value   = p.categoria;
       document.getElementById("pm-desc").value  = p.desc;
       document.getElementById("pm-preco").value = p.preco;
+      document.getElementById("pm-preco-revenda").value = p.precoRevenda || "";
       document.getElementById("pm-rend").value  = p.rendimento || "";
       document.getElementById("pm-title").textContent = "Editar produto";
       if (p.ingredientes) p.ingredientes.forEach(i => addIngRow(i));
@@ -6314,6 +6350,7 @@ function openProdModal(id) {
     document.getElementById("pm-nome").value  = "";
     document.getElementById("pm-desc").value  = "";
     document.getElementById("pm-preco").value = "";
+    document.getElementById("pm-preco-revenda").value = "";
     document.getElementById("pm-rend").value  = "";
     document.getElementById("pm-title").textContent = "Novo produto";
     addIngRow();
@@ -6376,6 +6413,7 @@ async function saveProduct() {
   const nome  = document.getElementById("pm-nome").value.trim();
   const desc  = document.getElementById("pm-desc").value.trim();
   const preco = parseFloat(document.getElementById("pm-preco").value);
+  const precoRevenda = parseFloat(document.getElementById("pm-preco-revenda").value) || null;
   if (!nome || !desc || !preco) { showToast("Preencha nome, descrição e preço!"); return; }
 
   const ingredientes = [];
@@ -6396,6 +6434,7 @@ async function saveProduct() {
 
   const data = {
     nome, desc, preco,
+    precoRevenda,
     categoria:     cat,
     rendimento:    parseInt(document.getElementById("pm-rend").value) || 1,
     emoji:         isCombo ? "🎁" : cat === "brownie" ? "🍫" : "🍪",
@@ -7175,6 +7214,20 @@ async function loadDashboard() {
   document.getElementById("kpi-lucro-d").innerHTML  = `<span class="kpi-delta flat">Custo op.: ${overhead}% | Ingredientes calculados</span>`;
   document.getElementById("kpi-ped-d").innerHTML    = _deltaHtml(orders.length, prev.length, "");
   document.getElementById("kpi-ticket-d").innerHTML = _deltaHtml(ticket, ticketPrev);
+
+  // Revenda KPI strip
+  const revendaOrders = orders.filter(o => o.tipoVenda === "revenda");
+  const revendaFat = revendaOrders.reduce((s,o) => s + (o.total||0), 0);
+  const stripEl = document.getElementById("kpi-revenda-strip");
+  if (stripEl) {
+    if (revendaOrders.length > 0) {
+      stripEl.style.display = "flex";
+      document.getElementById("kpi-revenda-fat").textContent = `R$ ${revendaFat.toFixed(2).replace(".",",")}`;
+      document.getElementById("kpi-revenda-ped").textContent = revendaOrders.length;
+    } else {
+      stripEl.style.display = "none";
+    }
+  }
 
   // Recent orders
   const recentEl = document.getElementById("recent-orders-list");
@@ -8919,6 +8972,7 @@ let _vpItems = []; // [{prodId, nome, preco, qty}]
 async function openVendaPresencial() {
   _vpClient = null;
   _vpItems = [];
+  window._vpTipo = "normal";
   document.getElementById("vp-client-search").value = "";
   document.getElementById("vp-client-list").style.display = "none";
   document.getElementById("vp-client-selected").style.display = "none";
@@ -8927,6 +8981,7 @@ async function openVendaPresencial() {
   document.getElementById("vp-desconto").value = "";
   window._vpDescontoTipo = "R$";
   vpSetDescontoTipo("R$");
+  vpSetTipo("normal");
   vpRenderItems();
   vpAddItem();
   // Load clients
@@ -8938,6 +8993,23 @@ async function openVendaPresencial() {
 
 function closeVendaPresencial() {
   document.getElementById("modal-venda-presencial").style.display = "none";
+}
+
+function vpSetTipo(tipo) {
+  window._vpTipo = tipo;
+  const btnNormal  = document.getElementById("vp-btn-normal");
+  const btnRevenda = document.getElementById("vp-btn-revenda");
+  if (btnNormal && btnRevenda) {
+    btnNormal.style.background  = tipo === "normal"  ? "var(--teal)" : "#fff";
+    btnNormal.style.color       = tipo === "normal"  ? "#fff"        : "var(--muted)";
+    btnNormal.style.borderColor = tipo === "normal"  ? "var(--teal)" : "var(--border)";
+    btnRevenda.style.background  = tipo === "revenda" ? "var(--teal)" : "#fff";
+    btnRevenda.style.color       = tipo === "revenda" ? "#fff"        : "var(--muted)";
+    btnRevenda.style.borderColor = tipo === "revenda" ? "var(--teal)" : "var(--border)";
+  }
+  // Recalcula preços dos itens já adicionados
+  vpRenderItems();
+  vpCalcTotal();
 }
 
 let _vpSearchResults = []; // cache dos resultados para seleção por índice
@@ -8981,16 +9053,19 @@ function vpRenderItems() {
   const container = document.getElementById("vp-items");
   if (!container) return;
   container.innerHTML = _vpItems.map((item, i) => {
+    const isRevenda = window._vpTipo === "revenda";
     // Estoque disponível para cada linha
     const stockInfo = allProducts.filter(p => p.ativo !== false).map(p => {
       const s = allStock[p.id];
       const qty = s && s.ativo ? (s.qty || 0) : null; // null = sem controle de estoque
       const esgotado = qty !== null && qty === 0;
+      const precoExibido = isRevenda && p.precoRevenda ? Number(p.precoRevenda) : Number(p.preco||0);
+      const revendaTag = isRevenda && p.precoRevenda ? " 🔄" : "";
       const label = qty === null
-        ? `${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")} `
+        ? `${p.nome}${revendaTag} — R$ ${precoExibido.toFixed(2).replace(".",",")} `
         : esgotado
-          ? `${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")}  ⚠ ESGOTADO`
-          : `${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")}  (${qty} em estoque)`;
+          ? `${p.nome}${revendaTag} — R$ ${precoExibido.toFixed(2).replace(".",",")}  ⚠ ESGOTADO`
+          : `${p.nome}${revendaTag} — R$ ${precoExibido.toFixed(2).replace(".",",")}  (${qty} em estoque)`;
       return { p, qty, esgotado, label };
     });
 
@@ -9027,9 +9102,10 @@ function vpRenderItems() {
 function vpSetProd(i, prodId) {
   const p = allProducts.find(x => x.id === prodId);
   if (p) {
+    const isRevenda = window._vpTipo === "revenda";
     _vpItems[i].prodId = p.id;
     _vpItems[i].nome   = p.nome;
-    _vpItems[i].preco  = Number(p.preco||0);
+    _vpItems[i].preco  = isRevenda && p.precoRevenda ? Number(p.precoRevenda) : Number(p.preco||0);
     // Ajusta qty para não ultrapassar o estoque disponível
     const s = allStock[p.id];
     const maxQty = s && s.ativo ? (s.qty || 0) : 999;
@@ -9135,6 +9211,7 @@ async function submitVendaPresencial() {
   const orderNum = "VP-" + Date.now().toString().slice(-6);
   const order = {
     tipo: "pronta-entrega",
+    tipoVenda: window._vpTipo === "revenda" ? "revenda" : "normal",
     status: "entregue",
     cliente: _vpClient ? { nome: _vpClient.nome, wpp: _vpClient.wpp } : { nome: "Venda Presencial", wpp: "" },
     clienteId: _vpClient?.id || null,
