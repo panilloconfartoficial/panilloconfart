@@ -229,112 +229,6 @@
 .admin-dark .admin-sidebar .sb-exit:hover span { color: #E8C9A0 !important; }
 .admin-dark .admin-sidebar .sb-logo-c img { filter: brightness(0.9); }
 
-/* ═══════════════════════════════════════════════════════
-   DARK MODE — MODAIS E OVERLAYS
-   Cobre todos os modais que usam background:#fff hardcoded
-   nos inline styles. Usa !important pois inline styles têm
-   maior especificidade que classes CSS.
-═══════════════════════════════════════════════════════ */
-
-/* Regra base: qualquer elemento com fundo branco hardcoded dentro de .admin-dark */
-.admin-dark [style*="background:#fff"],
-.admin-dark [style*="background: #fff"],
-.admin-dark [style*="background:white"] {
-  background: #2A1208 !important;
-  color: #F0E0D0 !important;
-}
-
-/* Inputs/selects/textareas filhos desses elementos */
-.admin-dark [style*="background:#fff"] input,
-.admin-dark [style*="background:#fff"] select,
-.admin-dark [style*="background:#fff"] textarea,
-.admin-dark [style*="background: #fff"] input,
-.admin-dark [style*="background: #fff"] select,
-.admin-dark [style*="background: #fff"] textarea {
-  background: #1E0E07 !important;
-  color: #F0E0D0 !important;
-  border-color: rgba(255,255,255,0.12) !important;
-}
-.admin-dark [style*="background:#fff"] label,
-.admin-dark [style*="background: #fff"] label { color: #D4B89A !important; }
-
-/* Dropdowns / autocomplete (têm box-shadow + background:#fff) */
-.admin-dark #vp-client-list {
-  background: #1E0E07 !important;
-  border-color: rgba(255,255,255,0.12) !important;
-  color: #F0E0D0 !important;
-}
-.admin-dark #vp-client-list > div { color: #F0E0D0 !important; }
-.admin-dark #vp-client-list > div:hover { background: rgba(255,255,255,0.06) !important; }
-
-/* Prod / Ing modals (usam classes CSS, não inline) */
-.admin-dark .prod-modal {
-  background: #2A1208 !important;
-  color: #F0E0D0 !important;
-}
-.admin-dark .pm-title  { color: #E8C9A0 !important; }
-.admin-dark .pm-header { border-bottom-color: rgba(255,255,255,0.08) !important; }
-.admin-dark .pm-footer { border-top-color: rgba(255,255,255,0.08) !important; background: #2A1208 !important; }
-.admin-dark .pm-body   { background: #2A1208 !important; color: #F0E0D0 !important; }
-.admin-dark .prod-modal input,
-.admin-dark .prod-modal select,
-.admin-dark .prod-modal textarea {
-  background: #1E0E07 !important;
-  color: #F0E0D0 !important;
-  border-color: rgba(255,255,255,0.12) !important;
-}
-.admin-dark .prod-modal label { color: #D4B89A !important; }
-.admin-dark .photo-zone { border-color: rgba(255,255,255,0.15) !important; color: #9A7A62 !important; background: #1E0E07 !important; }
-
-/* Client detail modal */
-.admin-dark .client-detail-box {
-  background: #2A1208 !important;
-  color: #F0E0D0 !important;
-}
-.admin-dark .client-detail-box h3,
-.admin-dark .client-detail-box h4 { color: #E8C9A0 !important; }
-
-/* Avaliação modal */
-.admin-dark .aval-box {
-  background: #2A1208 !important;
-  color: #F0E0D0 !important;
-}
-
-/* Fiado auth card */
-.admin-dark .fiado-auth-card {
-  background: #2A1208 !important;
-  color: #F0E0D0 !important;
-}
-.admin-dark .fiado-auth-card input,
-.admin-dark .fiado-auth-card select {
-  background: #1E0E07 !important;
-  color: #F0E0D0 !important;
-  border-color: rgba(255,255,255,0.12) !important;
-}
-.admin-dark .fiado-auth-card h3,
-.admin-dark .fiado-auth-card p,
-.admin-dark .fiado-auth-card label { color: #D4B89A !important; }
-
-/* Seção Total (background:var(--cream) no VP modal) */
-.admin-dark [style*="background:var(--cream)"],
-.admin-dark [style*="background: var(--cream)"] {
-  background: #381808 !important;
-}
-
-/* Portal tabs */
-.admin-dark .portal-tab.active {
-  background: #2A1208 !important;
-  color: #E8C9A0 !important;
-  box-shadow: none !important;
-}
-
-/* Selects avulsos fora do #page-admin (hist, dep, fiado desc etc.) */
-.admin-dark select { background: #1E0E07 !important; color: #F0E0D0 !important; border-color: rgba(255,255,255,0.12) !important; }
-
-/* Botão toggle % desconto VP (começa como fundo branco) */
-.admin-dark #vp-desc-tipo-P { background: #1E0E07 !important; color: #9A7A62 !important; }
-.admin-dark #vp-desc-tipo-R { background: #C47B35 !important; color: #fff !important; }
-
 /* Botão dark mode na topbar */
 #dark-toggle-btn {
   background: none;
@@ -2358,16 +2252,15 @@ img { max-width: 100%; display: block; }
           <input class="fi" id="pm-preco" type="number" step="0.01" placeholder="0,00">
         </div>
         <div class="fg">
+          <label class="fl">Preço de revenda (R$) <span style="font-size:10px;color:var(--muted);font-weight:400;">opcional</span></label>
+          <input class="fi" id="pm-preco-revenda" type="number" step="0.01" placeholder="0,00" title="Preço aplicado ao ativar modo Revenda na Venda Presencial">
+        </div>
+      </div>
+      <div class="f2">
+        <div class="fg">
           <label class="fl">Rendimento (unidades)</label>
           <input class="fi" id="pm-rend" type="number" placeholder="Ex: 12">
         </div>
-      </div>
-      <div class="fg" style="margin-bottom:14px;">
-        <label class="fl" style="display:flex;align-items:center;gap:6px;">
-          Preço de revenda (R$)
-          <span style="font-size:10px;color:var(--muted);font-weight:400;">— deixe vazio se não tiver</span>
-        </label>
-        <input class="fi" id="pm-preco-revenda" type="number" step="0.01" placeholder="0,00 (opcional)">
       </div>
       <!-- Campos exclusivos do COMBO -->
       <div id="combo-fields" class="hidden" style="background:var(--gold-pale);border:1px solid rgba(200,144,42,0.25);border-radius:12px;padding:16px;margin-bottom:14px;">
@@ -2624,12 +2517,6 @@ img { max-width: 100%; display: block; }
             <div class="kpi-delta" id="kpi-ticket-d"></div>
           </div>
         </div>
-        <!-- Revenda KPI strip -->
-        <div id="kpi-revenda-strip" style="display:none;background:rgba(15,74,74,0.06);border:1px solid rgba(15,74,74,0.15);border-radius:10px;padding:10px 16px;margin-bottom:16px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
-          <span style="font-size:11px;font-weight:700;color:var(--teal-dark);text-transform:uppercase;letter-spacing:.5px;">🔄 Revenda no período</span>
-          <span style="font-size:13px;color:var(--text);">Faturamento: <strong id="kpi-revenda-fat">R$ 0,00</strong></span>
-          <span style="font-size:13px;color:var(--text);">Pedidos: <strong id="kpi-revenda-ped">0</strong></span>
-        </div>
         <div class="ai-panel">
           <div class="ai-header">
             <div class="ai-dot"></div>
@@ -2848,17 +2735,6 @@ img { max-width: 100%; display: block; }
           <h3 style="font-size:17px;font-weight:700;color:var(--text);margin:0;">🛒 Venda Presencial</h3>
           <button onclick="closeVendaPresencial()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
         </div>
-        <!-- Tipo de venda -->
-        <div style="display:flex;gap:8px;margin-bottom:16px;">
-          <button id="vp-btn-normal" onclick="vpSetTipo('normal')"
-            style="flex:1;padding:9px;border-radius:10px;border:1.5px solid var(--teal);background:var(--teal);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">
-            🏪 Normal
-          </button>
-          <button id="vp-btn-revenda" onclick="vpSetTipo('revenda')"
-            style="flex:1;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">
-            🔄 Revenda
-          </button>
-        </div>
         <!-- Client selector -->
         <div style="margin-bottom:16px;">
           <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;">Cliente (opcional)</label>
@@ -2886,6 +2762,23 @@ img { max-width: 100%; display: block; }
             <option value="debito">Cartão Débito</option>
             <option value="fiado">Fiado</option>
           </select>
+        </div>
+        <!-- Revenda -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:8px;">Tipo de Venda</label>
+          <div style="display:flex;gap:8px;">
+            <button id="vp-tipo-varejo" onclick="vpSetTipo('varejo')"
+              style="flex:1;padding:9px;border:1.5px solid var(--teal);border-radius:10px;background:var(--teal);color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
+              🛒 Varejo
+            </button>
+            <button id="vp-tipo-revenda" onclick="vpSetTipo('revenda')"
+              style="flex:1;padding:9px;border:1.5px solid var(--border);border-radius:10px;background:#fff;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
+              🏪 Revenda
+            </button>
+          </div>
+          <div id="vp-revenda-aviso" style="display:none;margin-top:8px;font-size:11px;color:#b35c00;background:#FFF3E0;border-radius:8px;padding:7px 10px;">
+            ⚠️ Preços de revenda aplicados nos produtos que possuem esse valor cadastrado.
+          </div>
         </div>
         <!-- Desconto -->
         <div style="margin-bottom:16px;">
@@ -2961,12 +2854,6 @@ img { max-width: 100%; display: block; }
             <option value="todos">✅ Confirmação</option>
             <option value="pago">✓ Pagos</option>
             <option value="pendente">Confirmar pag.</option>
-          </select>
-          <select id="orders-filter-tipo" onchange="ordersPage=1;renderOrders()"
-            style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--text);cursor:pointer;">
-            <option value="todos">🔄 Tipo de venda</option>
-            <option value="normal">Normal</option>
-            <option value="revenda">Revenda</option>
           </select>
           <select id="orders-sort" onchange="ordersPage=1;renderOrders()"
             style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--text);cursor:pointer;">
@@ -4943,7 +4830,6 @@ function renderOrders() {
   const q = (document.getElementById("orders-search")?.value || "").toLowerCase();
   const filterPag  = document.getElementById("orders-filter-pag")?.value  || "todos";
   const filterConf = document.getElementById("orders-filter-conf")?.value || "todos";
-  const filterTipo = document.getElementById("orders-filter-tipo")?.value || "todos";
   const sort       = document.getElementById("orders-sort")?.value         || "data-desc";
 
   let list = orderFilterStatus === "todos" ? allOrders : allOrders.filter(o => o.status === orderFilterStatus);
@@ -4963,10 +4849,6 @@ function renderOrders() {
   // Filtro confirmação de pagamento
   if (filterConf === "pago")    list = list.filter(o => o.pagamentoConfirmado);
   if (filterConf === "pendente") list = list.filter(o => !o.pagamentoConfirmado);
-
-  // Filtro tipo de venda
-  if (filterTipo === "revenda") list = list.filter(o => o.tipoVenda === "revenda");
-  if (filterTipo === "normal")  list = list.filter(o => !o.tipoVenda || o.tipoVenda === "normal");
 
   // Ordenação
   list = [...list].sort((a, b) => {
@@ -5015,9 +4897,9 @@ function renderOrders() {
         </select>`;
         return `
         <tr style="${o.status==='cancelado'?'opacity:.6;':''}">
-          <td><strong>${o.cliente?.nome || "—"}</strong>${o.tipoVenda === "revenda" ? ` <span style="font-size:9px;font-weight:700;background:#0F4A4A;color:#fff;padding:2px 6px;border-radius:6px;vertical-align:middle;">REVENDA</span>` : ""}<br><span style="font-size:11px;color:var(--muted);">${o.cliente?.wpp || ""}</span></td>
+          <td><strong>${o.cliente?.nome || "—"}</strong><br><span style="font-size:11px;color:var(--muted);">${o.cliente?.wpp || ""}</span></td>
           <td style="font-size:12px;">${(o.itens||[]).map(i=>`${i.qty}× ${i.nome}`).join(", ")}</td>
-          <td>${o.dataRetirada ? new Date(o.dataRetirada+"T12:00").toLocaleDateString("pt-BR") : "—"}<br><span style="font-size:11px;color:var(--muted);">${o.periodo||""}</span></td>
+          <td>${o.dataRetirada ? new Date(o.dataRetirada+"T12:00").toLocaleDateString("pt-BR") : "—"}<br><span style="font-size:11px;color:var(--muted);">${o.periodo||""}${o.tipoVenda==="revenda" ? ' <span style="background:#FFF3E0;color:#b35c00;border-radius:5px;padding:1px 5px;font-size:10px;font-weight:700;">REVENDA</span>' : ""}</span></td>
           <td>${paySelect}</td>
           <td>${payPaid}</td>
           <td>
@@ -6413,7 +6295,8 @@ async function saveProduct() {
   const nome  = document.getElementById("pm-nome").value.trim();
   const desc  = document.getElementById("pm-desc").value.trim();
   const preco = parseFloat(document.getElementById("pm-preco").value);
-  const precoRevenda = parseFloat(document.getElementById("pm-preco-revenda").value) || null;
+  const precoRevendaRaw = document.getElementById("pm-preco-revenda").value;
+  const precoRevenda = precoRevendaRaw ? parseFloat(precoRevendaRaw) : null;
   if (!nome || !desc || !preco) { showToast("Preencha nome, descrição e preço!"); return; }
 
   const ingredientes = [];
@@ -6434,7 +6317,7 @@ async function saveProduct() {
 
   const data = {
     nome, desc, preco,
-    precoRevenda,
+    precoRevenda: precoRevenda,
     categoria:     cat,
     rendimento:    parseInt(document.getElementById("pm-rend").value) || 1,
     emoji:         isCombo ? "🎁" : cat === "brownie" ? "🍫" : "🍪",
@@ -7214,20 +7097,6 @@ async function loadDashboard() {
   document.getElementById("kpi-lucro-d").innerHTML  = `<span class="kpi-delta flat">Custo op.: ${overhead}% | Ingredientes calculados</span>`;
   document.getElementById("kpi-ped-d").innerHTML    = _deltaHtml(orders.length, prev.length, "");
   document.getElementById("kpi-ticket-d").innerHTML = _deltaHtml(ticket, ticketPrev);
-
-  // Revenda KPI strip
-  const revendaOrders = orders.filter(o => o.tipoVenda === "revenda");
-  const revendaFat = revendaOrders.reduce((s,o) => s + (o.total||0), 0);
-  const stripEl = document.getElementById("kpi-revenda-strip");
-  if (stripEl) {
-    if (revendaOrders.length > 0) {
-      stripEl.style.display = "flex";
-      document.getElementById("kpi-revenda-fat").textContent = `R$ ${revendaFat.toFixed(2).replace(".",",")}`;
-      document.getElementById("kpi-revenda-ped").textContent = revendaOrders.length;
-    } else {
-      stripEl.style.display = "none";
-    }
-  }
 
   // Recent orders
   const recentEl = document.getElementById("recent-orders-list");
@@ -8968,11 +8837,38 @@ function _drawLineChart(canvasId, tooltipId, labels, series, fmtVal) {
 // ═══════════════════════════════════════════════════════
 let _vpClient = null;
 let _vpItems = []; // [{prodId, nome, preco, qty}]
+let _vpTipo = "varejo"; // "varejo" | "revenda"
+
+function vpSetTipo(tipo) {
+  _vpTipo = tipo;
+  const btnV = document.getElementById("vp-tipo-varejo");
+  const btnR = document.getElementById("vp-tipo-revenda");
+  const aviso = document.getElementById("vp-revenda-aviso");
+  if (btnV && btnR) {
+    btnV.style.background    = tipo === "varejo" ? "var(--teal)" : "#fff";
+    btnV.style.color         = tipo === "varejo" ? "#fff" : "var(--muted)";
+    btnV.style.borderColor   = tipo === "varejo" ? "var(--teal)" : "var(--border)";
+    btnR.style.background    = tipo === "revenda" ? "var(--teal)" : "#fff";
+    btnR.style.color         = tipo === "revenda" ? "#fff" : "var(--muted)";
+    btnR.style.borderColor   = tipo === "revenda" ? "var(--teal)" : "var(--border)";
+  }
+  if (aviso) aviso.style.display = tipo === "revenda" ? "block" : "none";
+  // Atualiza preços nos itens que têm precoRevenda
+  _vpItems = _vpItems.map(item => {
+    const prod = allProducts.find(p => p.id === item.prodId);
+    if (!prod) return item;
+    const novoPreco = tipo === "revenda" && prod.precoRevenda
+      ? Number(prod.precoRevenda)
+      : Number(prod.preco);
+    return { ...item, preco: novoPreco };
+  });
+  renderVpItems();
+  vpCalcTotal();
+}
 
 async function openVendaPresencial() {
   _vpClient = null;
   _vpItems = [];
-  window._vpTipo = "normal";
   document.getElementById("vp-client-search").value = "";
   document.getElementById("vp-client-list").style.display = "none";
   document.getElementById("vp-client-selected").style.display = "none";
@@ -8981,7 +8877,8 @@ async function openVendaPresencial() {
   document.getElementById("vp-desconto").value = "";
   window._vpDescontoTipo = "R$";
   vpSetDescontoTipo("R$");
-  vpSetTipo("normal");
+  _vpTipo = "varejo";
+  vpSetTipo("varejo");
   vpRenderItems();
   vpAddItem();
   // Load clients
@@ -8993,23 +8890,6 @@ async function openVendaPresencial() {
 
 function closeVendaPresencial() {
   document.getElementById("modal-venda-presencial").style.display = "none";
-}
-
-function vpSetTipo(tipo) {
-  window._vpTipo = tipo;
-  const btnNormal  = document.getElementById("vp-btn-normal");
-  const btnRevenda = document.getElementById("vp-btn-revenda");
-  if (btnNormal && btnRevenda) {
-    btnNormal.style.background  = tipo === "normal"  ? "var(--teal)" : "#fff";
-    btnNormal.style.color       = tipo === "normal"  ? "#fff"        : "var(--muted)";
-    btnNormal.style.borderColor = tipo === "normal"  ? "var(--teal)" : "var(--border)";
-    btnRevenda.style.background  = tipo === "revenda" ? "var(--teal)" : "#fff";
-    btnRevenda.style.color       = tipo === "revenda" ? "#fff"        : "var(--muted)";
-    btnRevenda.style.borderColor = tipo === "revenda" ? "var(--teal)" : "var(--border)";
-  }
-  // Recalcula preços dos itens já adicionados
-  vpRenderItems();
-  vpCalcTotal();
 }
 
 let _vpSearchResults = []; // cache dos resultados para seleção por índice
@@ -9053,19 +8933,16 @@ function vpRenderItems() {
   const container = document.getElementById("vp-items");
   if (!container) return;
   container.innerHTML = _vpItems.map((item, i) => {
-    const isRevenda = window._vpTipo === "revenda";
     // Estoque disponível para cada linha
     const stockInfo = allProducts.filter(p => p.ativo !== false).map(p => {
       const s = allStock[p.id];
       const qty = s && s.ativo ? (s.qty || 0) : null; // null = sem controle de estoque
       const esgotado = qty !== null && qty === 0;
-      const precoExibido = isRevenda && p.precoRevenda ? Number(p.precoRevenda) : Number(p.preco||0);
-      const revendaTag = isRevenda && p.precoRevenda ? " 🔄" : "";
       const label = qty === null
-        ? `${p.nome}${revendaTag} — R$ ${precoExibido.toFixed(2).replace(".",",")} `
+        ? `${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")} `
         : esgotado
-          ? `${p.nome}${revendaTag} — R$ ${precoExibido.toFixed(2).replace(".",",")}  ⚠ ESGOTADO`
-          : `${p.nome}${revendaTag} — R$ ${precoExibido.toFixed(2).replace(".",",")}  (${qty} em estoque)`;
+          ? `${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")}  ⚠ ESGOTADO`
+          : `${p.nome} — R$ ${Number(p.preco||0).toFixed(2).replace(".",",")}  (${qty} em estoque)`;
       return { p, qty, esgotado, label };
     });
 
@@ -9102,11 +8979,12 @@ function vpRenderItems() {
 function vpSetProd(i, prodId) {
   const p = allProducts.find(x => x.id === prodId);
   if (p) {
-    const isRevenda = window._vpTipo === "revenda";
     _vpItems[i].prodId = p.id;
     _vpItems[i].nome   = p.nome;
-    _vpItems[i].preco  = isRevenda && p.precoRevenda ? Number(p.precoRevenda) : Number(p.preco||0);
-    // Ajusta qty para não ultrapassar o estoque disponível
+    // Usa preço de revenda se modo revenda estiver ativo e produto tiver esse preço
+    _vpItems[i].preco  = (_vpTipo === "revenda" && p.precoRevenda)
+      ? Number(p.precoRevenda)
+      : Number(p.preco || 0);
     const s = allStock[p.id];
     const maxQty = s && s.ativo ? (s.qty || 0) : 999;
     if (maxQty > 0) {
@@ -9211,7 +9089,7 @@ async function submitVendaPresencial() {
   const orderNum = "VP-" + Date.now().toString().slice(-6);
   const order = {
     tipo: "pronta-entrega",
-    tipoVenda: window._vpTipo === "revenda" ? "revenda" : "normal",
+    tipoVenda: _vpTipo || "varejo",
     status: "entregue",
     cliente: _vpClient ? { nome: _vpClient.nome, wpp: _vpClient.wpp } : { nome: "Venda Presencial", wpp: "" },
     clienteId: _vpClient?.id || null,
