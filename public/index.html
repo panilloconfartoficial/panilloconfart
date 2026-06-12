@@ -2683,6 +2683,15 @@ img { max-width: 100%; display: block; }
           </div>
         </div>
 
+        <!-- Totais por Categoria -->
+        <div class="admin-card" style="padding:20px;margin-bottom:20px;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">📦 Totais por Categoria</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">unidades vendidas no período selecionado</div>
+          <div id="ind-cat-totais" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
+            <div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;grid-column:1/-1;">Carregando...</div>
+          </div>
+        </div>
+
         <!-- Ranking Produtos + Ranking Clientes -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;" class="ind-charts-grid">
           <div class="admin-card" style="padding:20px;">
@@ -2709,7 +2718,7 @@ img { max-width: 100%; display: block; }
             <div id="ind-prod-lucro-sub" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
           </div>
           <div class="admin-card" style="padding:20px;">
-            <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">🔥 Maior Saída (Unidades)</div>
+            <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">📈 Em Alta</div>
             <div id="ind-prod-saida" style="font-size:16px;font-weight:700;color:var(--teal-dark);">—</div>
             <div id="ind-prod-saida-sub" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
           </div>
@@ -3500,6 +3509,14 @@ img { max-width: 100%; display: block; }
             <div class="fg" style="margin:0;flex:1;min-width:80px;">
               <label class="fl">% Desconto</label>
               <input class="fi" id="new-coupon-pct" type="number" min="1" max="100" placeholder="10">
+            </div>
+            <div class="fg" style="margin:0;flex:1;min-width:130px;">
+              <label class="fl">Validade <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
+              <input class="fi" id="new-coupon-validade" type="date">
+            </div>
+            <div class="fg" style="margin:0;flex:1;min-width:110px;">
+              <label class="fl">Limite de usos <span style="font-weight:400;text-transform:none;">(opcional)</span></label>
+              <input class="fi" id="new-coupon-maxusos" type="number" min="1" placeholder="Ilimitado">
             </div>
             <button class="btn-sm-primary" onclick="addCoupon()" style="flex-shrink:0;align-self:flex-end;">Adicionar</button>
           </div>
@@ -4498,8 +4515,20 @@ async function buscarClienteExistente() {
   result.innerHTML = `<span style="color:var(--muted);">Buscando...</span>`;
 
   try {
-    let clients = allClients;
-    if (!clients.length) { clients = await fbGet("clients"); allClients = clients; }
+    // ⚠️ ATENÇÃO — DÉBITO DE SEGURANÇA CONHECIDO:
+    // Esta busca (acessível sem login, na tela 0 do checkout) depende de
+    // fbGet("clients"), que faz getDocs() na coleção INTEIRA de clientes.
+    // Para isso funcionar sem erro de permissão, as regras do Firestore
+    // precisam permitir leitura pública de "clients" — o que significa que
+    // qualquer visitante pode, via devtools, obter nome/WhatsApp/total
+    // gasto de TODOS os clientes cadastrados.
+    // Correção real: criar um endpoint server-side (ex: Cloud Function
+    // /api/find-client?wpp=...) que faça essa busca no backend e devolva
+    // apenas o cliente correspondente, e então restringir a leitura
+    // direta de "clients" no Firestore a usuários autenticados (admin).
+    // Não usamos allClients (cache compartilhado com o admin) aqui de
+    // propósito, para não persistir esse dump em memória além do necessário.
+    const clients = await fbGet("clients");
     const found = clients.find(c => (c.wpp||"").replace(/\D/g,"") === wpp);
     if (found) {
       result.innerHTML = `
@@ -4628,7 +4657,53 @@ async function goStep(n) {
 
 async function submitOrder() {
   const items = Object.values(cart);
+
+  // ⚠️ MITIGAÇÃO PARCIAL DE SEGURANÇA — DÉBITO CONHECIDO:
+  // O pedido é montado e gravado inteiramente no client-side (preços,
+  // subtotal, desconto e total calculados aqui), sem revalidação no
+  // servidor. Alguém com devtools pode, em tese, alterar i.prod.preco
+  // ou activeCoupon.pct em memória antes de clicar em finalizar.
+  // Esta verificação cruza os preços do carrinho com allProducts (a lista
+  // de produtos carregada do Firestore) e bloqueia o envio se houver
+  // divergência — cobre o caso comum de adulteração no estado do carrinho,
+  // mas NÃO substitui validação server-side (Cloud Function / regras do
+  // Firestore que recalculem o total a partir dos IDs e quantidades antes
+  // de aceitar o documento em "orders").
+  for (const i of items) {
+    const canonical = allProducts.find(p => p.id === i.prod.id);
+    if (canonical && Number(canonical.preco) !== Number(i.prod.preco)) {
+      showToast("Os preços do carrinho estão desatualizados. Atualizando...");
+      i.prod.preco = Number(canonical.preco);
+    }
+  }
+
   const subtotal = items.reduce((s,i) => s + i.prod.preco * i.qty, 0);
+
+  // Revalida o cupom no momento da finalização (pode ter expirado/esgotado
+  // entre a aplicação e a confirmação do pedido)
+  if (activeCoupon) {
+    const today = new Date().toISOString().split("T")[0];
+    const expirado = activeCoupon.validade && activeCoupon.validade < today;
+    const esgotado = activeCoupon.maxUsos && (activeCoupon.usos||0) >= activeCoupon.maxUsos;
+    // Revalida também o percentual contra a config oficial de cupons,
+    // caso activeCoupon.pct tenha sido adulterado em memória
+    const cfgCheck = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+    const officialCoupon = (cfgCheck.coupons||[]).find(c => c.code === activeCoupon.code);
+    if (officialCoupon && Number(officialCoupon.pct) !== Number(activeCoupon.pct)) {
+      activeCoupon = { ...activeCoupon, pct: officialCoupon.pct };
+    }
+    if (expirado || esgotado) {
+      activeCoupon = null;
+      const wrap = document.getElementById("coupon-badge-wrap");
+      const discRow = document.getElementById("discount-row");
+      if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">Cupom ${expirado?"expirou":"atingiu o limite de usos"} — desconto removido.</div>`;
+      if (discRow) discRow.style.display = "none";
+      updateCartUI();
+      renderOrderSummary("order-summary-2");
+      showToast("Cupom não é mais válido — pedido recalculado sem desconto.");
+    }
+  }
+
   const discPct  = activeCoupon ? activeCoupon.pct : 0;
   const total    = subtotal * (1 - discPct/100);
   const client   = JSON.parse(localStorage.getItem("panillo-cliente") || "{}");
@@ -4666,6 +4741,10 @@ async function submitOrder() {
     // Handle fiado payment
     if (selectedPay === "fiado") {
       await addFiadoDebt(client, order);
+    }
+    // Registra o uso do cupom (incrementa contador persistido)
+    if (activeCoupon) {
+      try { await incrementCouponUsage(activeCoupon.code); } catch(e) { console.warn("Cupom usage:", e); }
     }
   } catch(e) { console.warn("Firebase offline", e); }
 
@@ -7684,21 +7763,37 @@ function renderCouponsList() {
     el.innerHTML = `<div style="color:var(--muted);font-size:12px;margin-bottom:8px;">Nenhum cupom cadastrado</div>`;
     return;
   }
-  el.innerHTML = coupons.map((c,i) => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--cream);border-radius:8px;margin-bottom:6px;">
-      <div><strong style="font-size:13px;">${c.code}</strong><span style="color:var(--muted);font-size:12px;margin-left:8px;">${c.pct}% de desconto</span></div>
+  const today = new Date().toISOString().split("T")[0];
+  el.innerHTML = coupons.map((c,i) => {
+    const usos = c.usos || 0;
+    const expirado = c.validade && c.validade < today;
+    const esgotado = c.maxUsos && usos >= c.maxUsos;
+    const inativo = expirado || esgotado;
+    let detalhes = `${c.pct}% de desconto`;
+    if (c.validade) detalhes += ` · válido até ${c.validade.split("-").reverse().join("/")}`;
+    if (c.maxUsos)  detalhes += ` · ${usos}/${c.maxUsos} usos`;
+    else if (usos)  detalhes += ` · ${usos} uso(s)`;
+    if (inativo) detalhes += ` · <strong style="color:#993C1D;">${expirado ? "expirado" : "esgotado"}</strong>`;
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--cream);border-radius:8px;margin-bottom:6px;${inativo?'opacity:.6;':''}">
+      <div><strong style="font-size:13px;">${c.code}</strong><span style="color:var(--muted);font-size:12px;margin-left:8px;">${detalhes}</span></div>
       <button onclick="removeCoupon(${i})" style="background:none;border:none;color:#993C1D;cursor:pointer;font-size:16px;line-height:1;">×</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 async function addCoupon() {
   const code = (document.getElementById("new-coupon-code")?.value || "").trim().toUpperCase();
   const pct  = parseInt(document.getElementById("new-coupon-pct")?.value || "0");
+  const validade = document.getElementById("new-coupon-validade")?.value || null;
+  const maxUsosRaw = document.getElementById("new-coupon-maxusos")?.value || "";
+  const maxUsos = maxUsosRaw ? parseInt(maxUsosRaw) : null;
   if (!code || !pct || pct < 1 || pct > 100) { showToast("Preencha código e % válidos!"); return; }
+  if (maxUsosRaw && (!maxUsos || maxUsos < 1)) { showToast("Limite de usos inválido!"); return; }
   const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
   cfg.coupons = cfg.coupons || [];
   if (cfg.coupons.find(c=>c.code===code)) { showToast("Cupom já existe!"); return; }
-  cfg.coupons.push({ code, pct });
+  cfg.coupons.push({ code, pct, validade: validade || null, maxUsos: maxUsos || null, usos: 0 });
   localStorage.setItem("panillo-config", JSON.stringify(cfg));
   try {
     const docs = await fbGet("appConfig");
@@ -7707,8 +7802,31 @@ async function addCoupon() {
   } catch(e) { console.warn("Cupom: Firebase indisponível.", e); }
   document.getElementById("new-coupon-code").value = "";
   document.getElementById("new-coupon-pct").value  = "";
+  document.getElementById("new-coupon-validade").value = "";
+  document.getElementById("new-coupon-maxusos").value  = "";
   renderCouponsList();
   showToast(`Cupom ${code} criado!`);
+}
+
+// Incrementa o contador de usos de um cupom (config local + Firestore)
+async function incrementCouponUsage(code) {
+  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  cfg.coupons = cfg.coupons || [];
+  const c = cfg.coupons.find(c => c.code === code);
+  if (!c) return;
+  c.usos = (c.usos||0) + 1;
+  localStorage.setItem("panillo-config", JSON.stringify(cfg));
+  try {
+    const docs = await fbGet("appConfig");
+    if (docs.length > 0) {
+      // Re-busca coupons atuais do Firestore para evitar sobrescrever
+      // alterações concorrentes feitas por outro cliente/admin
+      const remote = docs[0].coupons || [];
+      const rc = remote.find(x => x.code === code);
+      if (rc) rc.usos = (rc.usos||0) + 1;
+      await fbUpdate("appConfig", docs[0].id, { coupons: remote.length ? remote : cfg.coupons });
+    }
+  } catch(e) { console.warn("Cupom usage sync:", e); }
 }
 
 async function removeCoupon(idx) {
@@ -7740,14 +7858,24 @@ async function applyCoupon() {
   const found = (cfg.coupons||[]).find(c=>c.code===code);
   const wrap  = document.getElementById("coupon-badge-wrap");
   const discRow = document.getElementById("discount-row");
+  // Valida expiração e limite de uso antes de aceitar o cupom
+  let invalido = null;
   if (found) {
+    const today = new Date().toISOString().split("T")[0];
+    if (found.validade && found.validade < today) invalido = "expirado";
+    else if (found.maxUsos && (found.usos||0) >= found.maxUsos) invalido = "esgotado";
+  }
+  if (found && !invalido) {
     activeCoupon = found;
     if (wrap) wrap.innerHTML = `<div class="coupon-badge">✓ ${found.code} — ${found.pct}% de desconto</div>`;
     updateCartUI();
     showToast(`Cupom aplicado: ${found.pct}% de desconto!`);
   } else {
     activeCoupon = null;
-    if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">Cupom inválido ou expirado</div>`;
+    const msg = invalido === "expirado" ? "Cupom expirado"
+              : invalido === "esgotado" ? "Cupom atingiu o limite de usos"
+              : "Cupom inválido ou expirado";
+    if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">${msg}</div>`;
     if (discRow) discRow.style.display = "none";
     updateCartUI();
   }
@@ -8541,8 +8669,63 @@ async function loadIndicadores(mode) {
   const recebido = filtered.filter(o => o.pagamentoConfirmado).reduce((s,o) => s + Number(o.total||0), 0);
   const aReceber = totalRec - recebido;
   const _cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
-  const overhead = (Number(_cfg.overhead) || 20) / 100;
-  const lucro = totalRec * (1 - overhead);
+  const overheadCfg = (Number(_cfg.overhead) || 20) / 100;
+
+  // Garante que produtos/ingredientes estão carregados para calcular custo real
+  if (!allProducts.length)    { try { allProducts    = await fbGet("products");    } catch {} }
+  if (!allIngredients.length) { try { allIngredients = await fbGet("ingredients"); } catch {} }
+
+  // Custo real por unidade, baseado na receita cadastrada (mesma fórmula da aba Suprimentos)
+  function productCostPerUnit(prod) {
+    if (!prod || !prod.ingredientes || !prod.ingredientes.length) return null;
+    let totalCost = 0;
+    prod.ingredientes.forEach(pi => {
+      const ing = allIngredients.find(i => i.id === pi.ingId);
+      if (!ing) return;
+      const pricePerG = ing.unit === "kg" ? ing.preco/1000 : ing.preco;
+      totalCost += pricePerG * pi.grams;
+    });
+    const withExtra = totalCost * 1.15;
+    const rend = prod.rendimento || 1;
+    return withExtra / rend;
+  }
+
+  // ── Mapa de produtos vendidos no período (com custo real quando disponível) ──
+  const prodMap = {}; // { nome: { qty, receita, custoReal, temCusto } }
+  let custoRealTotal = 0, receitaComCusto = 0, qtyComCusto = 0, totalQtyAll = 0;
+  filtered.forEach(o => {
+    (o.itens||[]).forEach(i => {
+      const k = i.nome || "?";
+      if (!prodMap[k]) prodMap[k] = { qty: 0, receita: 0, custoReal: 0, temCusto: false };
+      const qty = Number(i.qty||1);
+      const receita = qty * Number(i.preco||0);
+      prodMap[k].qty     += qty;
+      prodMap[k].receita += receita;
+      totalQtyAll += qty;
+
+      const prod = allProducts.find(p => p.nome === k);
+      const costPerUnit = productCostPerUnit(prod);
+      if (costPerUnit !== null) {
+        prodMap[k].temCusto = true;
+        const custo = costPerUnit * qty;
+        prodMap[k].custoReal += custo;
+        custoRealTotal += custo;
+        receitaComCusto += receita;
+        qtyComCusto += qty;
+      }
+    });
+  });
+
+  // Lucro: usa custo real de receita para os produtos que têm receita cadastrada,
+  // e aplica o overhead configurado (fallback) apenas sobre a receita dos produtos
+  // sem receita cadastrada — evita misturar dois critérios diferentes de margem.
+  const receitaSemCusto = totalRec - receitaComCusto;
+  const lucroComCusto = receitaComCusto - custoRealTotal;
+  const lucroSemCusto = receitaSemCusto * (1 - overheadCfg);
+  const lucro = lucroComCusto + lucroSemCusto;
+  const margemReal = totalRec > 0 ? (lucro/totalRec*100) : 0;
+  const coberturaReceitas = totalQtyAll > 0 ? Math.round((qtyComCusto/totalQtyAll)*100) : 0;
+
   const ticket = filtered.length ? totalRec / filtered.length : 0;
   const cancelados = orders.filter(o => {
     if (o.status !== "cancelado") return false;
@@ -8567,7 +8750,9 @@ async function loadIndicadores(mode) {
   document.getElementById("ind-recebido").textContent = fmt(recebido);
   document.getElementById("ind-areceber").textContent = fmt(aReceber);
   document.getElementById("ind-lucro").textContent = fmt(lucro);
-  document.getElementById("ind-lucro-pct").textContent = `Margem estimada: ${Math.round((1-overhead)*100)}% (overhead ${Math.round(overhead*100)}%)`;
+  document.getElementById("ind-lucro-pct").textContent = coberturaReceitas > 0
+    ? `Margem real: ${margemReal.toFixed(1)}% (${coberturaReceitas}% das unidades com custo de receita; restante por overhead ${Math.round(overheadCfg*100)}%)`
+    : `Margem estimada: ${Math.round((1-overheadCfg)*100)}% (overhead ${Math.round(overheadCfg*100)}% — cadastre receitas para custo real)`;
   document.getElementById("ind-pedidos").textContent = filtered.length;
   document.getElementById("ind-ticket").textContent = fmt(ticket);
   document.getElementById("ind-cancelados").textContent = cancelados;
@@ -8655,17 +8840,44 @@ async function loadIndicadores(mode) {
   if (el("ind-ticket-novo"))  el("ind-ticket-novo").textContent  = fmt(ticketNovo);
 
   // ── Ranking de Produtos ──────────────────────────────────
-  const prodMap = {}; // { nome: { qty, receita } }
-  filtered.forEach(o => {
-    (o.itens||[]).forEach(i => {
-      const k = i.nome || "?";
-      if (!prodMap[k]) prodMap[k] = { qty: 0, receita: 0 };
-      prodMap[k].qty     += Number(i.qty||1);
-      prodMap[k].receita += Number(i.qty||1) * Number(i.preco||0);
-    });
-  });
   const prodRank = Object.entries(prodMap).sort((a,b) => b[1].qty - a[1].qty);
   const maxQty   = prodRank[0]?.[1].qty || 1;
+
+  // ── Totais por Categoria (cookie / brownie / combo / total) ──
+  if (el("ind-cat-totais")) {
+    const catMap = {}; // { categoria: { qty, receita } }
+    let totalQty = 0, totalReceita = 0;
+    Object.entries(prodMap).forEach(([nome, d]) => {
+      const prod = allProducts.find(p => p.nome === nome);
+      const cat = prod?.categoria || "outros";
+      if (!catMap[cat]) catMap[cat] = { qty: 0, receita: 0 };
+      catMap[cat].qty     += d.qty;
+      catMap[cat].receita += d.receita;
+      totalQty     += d.qty;
+      totalReceita += d.receita;
+    });
+    const catLabels = { cookie: "🍪 Cookies", brownie: "🍫 Brownies", combo: "🎁 Combos", outros: "Outros" };
+    const catOrder = ["cookie","brownie","combo","outros"];
+    let catHtml = "";
+    catOrder.forEach(cat => {
+      if (!catMap[cat]) return;
+      catHtml += `<div style="background:var(--cream);border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-mid);margin-bottom:6px;">${catLabels[cat]}</div>
+        <div style="font-size:22px;font-weight:700;color:var(--teal-dark);">${catMap[cat].qty}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${fmt(catMap[cat].receita)}</div>
+      </div>`;
+    });
+    catHtml += `<div style="background:var(--teal-dark);border-radius:10px;padding:14px;text-align:center;">
+      <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.75);margin-bottom:6px;">Total Geral</div>
+      <div style="font-size:22px;font-weight:700;color:#fff;">${totalQty}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:2px;">${fmt(totalReceita)}</div>
+    </div>`;
+    if (!totalQty) {
+      el("ind-cat-totais").innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;grid-column:1/-1;">Nenhum produto vendido no período</div>';
+    } else {
+      el("ind-cat-totais").innerHTML = catHtml;
+    }
+  }
 
   if (el("ind-ranking-produtos")) {
     if (!prodRank.length) {
@@ -8687,13 +8899,48 @@ async function loadIndicadores(mode) {
     }
   }
 
-  // Produto mais lucrativo (por receita) e maior saída (por qtd)
+  // Produto mais lucrativo (por receita)
   const prodLucro = Object.entries(prodMap).sort((a,b) => b[1].receita - a[1].receita)[0];
-  const prodSaida = prodRank[0];
   if (el("ind-prod-lucro"))     el("ind-prod-lucro").textContent     = prodLucro ? prodLucro[0] : "—";
   if (el("ind-prod-lucro-sub")) el("ind-prod-lucro-sub").textContent = prodLucro ? `${fmt(prodLucro[1].receita)} em receita` : "";
-  if (el("ind-prod-saida"))     el("ind-prod-saida").textContent     = prodSaida ? prodSaida[0] : "—";
-  if (el("ind-prod-saida-sub")) el("ind-prod-saida-sub").textContent = prodSaida ? `${prodSaida[1].qty} unidades vendidas` : "";
+
+  // "Em Alta": produto com maior crescimento de unidades vendidas vs. período anterior de mesma duração
+  if (el("ind-prod-saida")) {
+    const prevCutoffEnd = new Date(cutoff.getTime() - 1000); // 1s antes do início do período atual
+    const prevCutoff = new Date(cutoff); prevCutoff.setDate(cutoff.getDate() - days);
+    const prevFiltered = orders.filter(o => {
+      if (!active.includes(o.status)) return false;
+      const ts = o.createdAt?.seconds ? new Date(o.createdAt.seconds*1000) : new Date(o.dataRetirada+"T12:00");
+      return ts >= prevCutoff && ts <= prevCutoffEnd;
+    });
+    const prevMap = {};
+    prevFiltered.forEach(o => (o.itens||[]).forEach(i => {
+      const k = i.nome || "?";
+      prevMap[k] = (prevMap[k]||0) + Number(i.qty||1);
+    }));
+    // Calcula variação para produtos vendidos no período atual
+    const variacoes = prodRank.map(([nome, d]) => {
+      const antes = prevMap[nome] || 0;
+      const delta = d.qty - antes;
+      const pct = antes > 0 ? (delta/antes*100) : (d.qty > 0 ? 100 : 0);
+      return { nome, qty: d.qty, antes, delta, pct };
+    }).filter(v => v.delta > 0); // só considera quem cresceu
+    variacoes.sort((a,b) => b.delta - a.delta);
+    const destaque = variacoes[0];
+    if (destaque) {
+      el("ind-prod-saida").textContent = destaque.nome;
+      el("ind-prod-saida-sub").textContent = destaque.antes > 0
+        ? `${destaque.qty} un. (+${destaque.delta} vs ${destaque.antes} no período anterior, +${Math.round(destaque.pct)}%)`
+        : `${destaque.qty} un. — novo no período (não vendido antes)`;
+    } else if (prodRank[0]) {
+      // Nenhum produto cresceu — mostra o líder do período mesmo assim
+      el("ind-prod-saida").textContent = prodRank[0][0];
+      el("ind-prod-saida-sub").textContent = `${prodRank[0][1].qty} un. — sem crescimento vs período anterior`;
+    } else {
+      el("ind-prod-saida").textContent = "—";
+      el("ind-prod-saida-sub").textContent = "";
+    }
+  }
 
   // ── Ranking de Clientes ──────────────────────────────────
   // Por gasto no período
