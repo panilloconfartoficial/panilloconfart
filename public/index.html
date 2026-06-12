@@ -12,7 +12,7 @@
 <!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { initializeFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp }
+  import { initializeFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, increment }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -59,8 +59,8 @@
   window._wppNumber = cfg.wppNumber;
   window._pixKey    = cfg.pixKey;
   window._fbModules = {
-    collection, addDoc, getDocs, doc, updateDoc, deleteDoc,
-    query, where, orderBy, serverTimestamp,
+    collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc,
+    query, where, orderBy, serverTimestamp, increment,
     signInWithEmailAndPassword, signOut, onAuthStateChanged
   };
 
@@ -3907,6 +3907,13 @@ async function fbGet(col) {
   const snap = await FB.getDocs(FB.collection(db, col));
   return snap.docs.map(d => ({ ...d.data(), id: d.id }));
 }
+// Escreve/atualiza um documento por ID conhecido com merge — não requer
+// leitura prévia do documento (cria se não existir, mescla se existir).
+// Usado para coleções onde o cliente público só tem permissão de
+// create/update, não de read (ex: "clients").
+async function fbSetMerge(col, id, data) {
+  return FB.setDoc(FB.doc(db, col, id), data, { merge: true });
+}
 
 // ─── TOAST ─────────────────────────────────────────────
 function showToast(msg) {
@@ -4309,72 +4316,33 @@ async function submitClientRegister() {
   localStorage.setItem("panillo-cliente", JSON.stringify(clientData));
 
   // Salva / atualiza no Firebase
+  // ─── ESQUEMA: ID do documento = WhatsApp normalizado ────────────────
+  // Mesma lógica de saveClientToFirebase: as regras do Firestore não
+  // permitem "read" público em "clients", então não há como verificar se
+  // o cliente já existe antes de escrever. Usamos setDoc(merge:true) com
+  // o WhatsApp normalizado como ID — isso cria ou atualiza sem leitura
+  // prévia. Campos de contador (pedidos/totalGasto/favorito) são
+  // deliberadamente OMITIDOS aqui para não zerar o histórico de um
+  // cliente que já tenha pedidos — eles só são definidos/incrementados em
+  // saveClientToFirebase (no momento de um pedido real).
   const wppNorm = String(wpp).replace(/\D/g,""); // normaliza para só dígitos
   let firebaseSaved = false;
   try {
     if (!db || !FB) throw new Error("Firebase não inicializado");
+    if (!wppNorm) throw new Error("WhatsApp inválido");
 
-    let existingDocs = null;
-    try {
-      existingDocs = await FB.getDocs(
-        FB.query(FB.collection(db, "clients"), FB.where("wpp", "==", wppNorm))
-      );
-      if (existingDocs.empty && wppNorm !== wpp) {
-        existingDocs = await FB.getDocs(
-          FB.query(FB.collection(db, "clients"), FB.where("wpp", "==", wpp))
-        );
-      }
-    } catch(queryErr) {
-      console.warn("Erro ao buscar cliente:", queryErr);
-      existingDocs = { empty: true };
-    }
-
-    if (existingDocs.empty) {
-      await FB.addDoc(FB.collection(db, "clients"), {
-        nome,
-        wpp:        wppNorm || wpp,
-        email:      email || "",
-        bday:       bday  || "",
-        obs:        obs   || "",
-        pedidos:    0,
-        totalGasto: 0,
-        favorito:   "",
-        createdAt:  FB.serverTimestamp()
-      });
-      firebaseSaved = true;
-      console.log("Novo cliente cadastrado via Cadastre-se:", nome);
-    } else {
-      await FB.updateDoc(existingDocs.docs[0].ref, {
-        nome,
-        wpp: wppNorm || wpp,
-        ...(email ? { email } : {}),
-        ...(bday  ? { bday  } : {}),
-        ...(obs   ? { obs   } : {})
-      });
-      firebaseSaved = true;
-      console.log("Cliente atualizado via Cadastre-se:", nome);
-    }
+    await fbSetMerge("clients", wppNorm, {
+      nome,
+      wpp: wppNorm,
+      ...(email ? { email } : {}),
+      ...(bday  ? { bday  } : {}),
+      ...(obs   ? { obs   } : {}),
+      lastCadastroAt: FB.serverTimestamp()
+    });
+    firebaseSaved = true;
+    console.log("Cliente salvo/atualizado via Cadastre-se (setDoc merge):", nome);
   } catch(e) {
     console.error("Erro ao salvar cadastro:", e);
-    // Fallback: tenta inserir diretamente sem verificar duplicata
-    try {
-      if (db && FB) {
-        await FB.addDoc(FB.collection(db, "clients"), {
-          nome,
-          wpp:        wppNorm || wpp,
-          email:      email || "",
-          bday:       bday  || "",
-          obs:        obs   || "",
-          pedidos:    0,
-          totalGasto: 0,
-          favorito:   "",
-          createdAt:  FB.serverTimestamp(),
-          _fallback:  true
-        });
-        firebaseSaved = true;
-        console.log("Cliente salvo via fallback:", nome);
-      }
-    } catch(e2) { console.error("Fallback também falhou:", e2); }
   }
   if (!firebaseSaved) {
     // Mesmo sem Firebase, o cadastro local funciona para o fluxo de compra
@@ -4515,22 +4483,18 @@ async function buscarClienteExistente() {
   result.innerHTML = `<span style="color:var(--muted);">Buscando...</span>`;
 
   try {
-    // ⚠️ ATENÇÃO — DÉBITO DE SEGURANÇA CONHECIDO:
-    // Esta busca (acessível sem login, na tela 0 do checkout) depende de
-    // fbGet("clients"), que faz getDocs() na coleção INTEIRA de clientes.
-    // Para isso funcionar sem erro de permissão, as regras do Firestore
-    // precisam permitir leitura pública de "clients" — o que significa que
-    // qualquer visitante pode, via devtools, obter nome/WhatsApp/total
-    // gasto de TODOS os clientes cadastrados.
-    // Correção real: criar um endpoint server-side (ex: Cloud Function
-    // /api/find-client?wpp=...) que faça essa busca no backend e devolva
-    // apenas o cliente correspondente, e então restringir a leitura
-    // direta de "clients" no Firestore a usuários autenticados (admin).
-    // Não usamos allClients (cache compartilhado com o admin) aqui de
-    // propósito, para não persistir esse dump em memória além do necessário.
-    const clients = await fbGet("clients");
-    const found = clients.find(c => (c.wpp||"").replace(/\D/g,"") === wpp);
-    if (found) {
+    // Busca via endpoint server-side (/api/find-client), que usa o Admin
+    // SDK para ler "clients" e devolve apenas os campos necessários do
+    // cliente correspondente — sem expor a coleção inteira ao navegador
+    // (que é o que fbGet("clients") fazia antes). As regras do Firestore
+    // continuam bloqueando leitura pública direta; este endpoint contorna
+    // isso com credenciais de admin no servidor.
+    const resp = await fetch(`/api/find-client?wpp=${encodeURIComponent(wpp)}`);
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data?.error || "Erro ao buscar");
+
+    if (data.found) {
+      const found = data;
       result.innerHTML = `
         <div style="background:#E8F5F0;border:1px solid #A8DCC8;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
           <div style="width:36px;height:36px;border-radius:50%;background:var(--teal-dark);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">
@@ -4543,7 +4507,7 @@ async function buscarClienteExistente() {
         </div>`;
       // Salva no localStorage para usar no step-1
       localStorage.setItem("panillo-cliente", JSON.stringify({
-        nome: found.nome, wpp: found.wpp,
+        nome: found.nome, wpp,
         email: found.email||"", bday: found.bday||"", obs: found.obs||""
       }));
     } else {
@@ -4553,6 +4517,7 @@ async function buscarClienteExistente() {
         </div>`;
     }
   } catch(e) {
+    console.warn("buscarClienteExistente:", e);
     result.innerHTML = `<span style="color:#993C1D;">Erro ao buscar. Tente novamente.</span>`;
   }
   btn.disabled = false; btn.textContent = "Buscar";
@@ -4657,96 +4622,76 @@ async function goStep(n) {
 
 async function submitOrder() {
   const items = Object.values(cart);
-
-  // ⚠️ MITIGAÇÃO PARCIAL DE SEGURANÇA — DÉBITO CONHECIDO:
-  // O pedido é montado e gravado inteiramente no client-side (preços,
-  // subtotal, desconto e total calculados aqui), sem revalidação no
-  // servidor. Alguém com devtools pode, em tese, alterar i.prod.preco
-  // ou activeCoupon.pct em memória antes de clicar em finalizar.
-  // Esta verificação cruza os preços do carrinho com allProducts (a lista
-  // de produtos carregada do Firestore) e bloqueia o envio se houver
-  // divergência — cobre o caso comum de adulteração no estado do carrinho,
-  // mas NÃO substitui validação server-side (Cloud Function / regras do
-  // Firestore que recalculem o total a partir dos IDs e quantidades antes
-  // de aceitar o documento em "orders").
-  for (const i of items) {
-    const canonical = allProducts.find(p => p.id === i.prod.id);
-    if (canonical && Number(canonical.preco) !== Number(i.prod.preco)) {
-      showToast("Os preços do carrinho estão desatualizados. Atualizando...");
-      i.prod.preco = Number(canonical.preco);
-    }
-  }
-
-  const subtotal = items.reduce((s,i) => s + i.prod.preco * i.qty, 0);
-
-  // Revalida o cupom no momento da finalização (pode ter expirado/esgotado
-  // entre a aplicação e a confirmação do pedido)
-  if (activeCoupon) {
-    const today = new Date().toISOString().split("T")[0];
-    const expirado = activeCoupon.validade && activeCoupon.validade < today;
-    const esgotado = activeCoupon.maxUsos && (activeCoupon.usos||0) >= activeCoupon.maxUsos;
-    // Revalida também o percentual contra a config oficial de cupons,
-    // caso activeCoupon.pct tenha sido adulterado em memória
-    const cfgCheck = JSON.parse(localStorage.getItem("panillo-config") || "{}");
-    const officialCoupon = (cfgCheck.coupons||[]).find(c => c.code === activeCoupon.code);
-    if (officialCoupon && Number(officialCoupon.pct) !== Number(activeCoupon.pct)) {
-      activeCoupon = { ...activeCoupon, pct: officialCoupon.pct };
-    }
-    if (expirado || esgotado) {
-      activeCoupon = null;
-      const wrap = document.getElementById("coupon-badge-wrap");
-      const discRow = document.getElementById("discount-row");
-      if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">Cupom ${expirado?"expirou":"atingiu o limite de usos"} — desconto removido.</div>`;
-      if (discRow) discRow.style.display = "none";
-      updateCartUI();
-      renderOrderSummary("order-summary-2");
-      showToast("Cupom não é mais válido — pedido recalculado sem desconto.");
-    }
-  }
-
-  const discPct  = activeCoupon ? activeCoupon.pct : 0;
-  const total    = subtotal * (1 - discPct/100);
-  const client   = JSON.parse(localStorage.getItem("panillo-cliente") || "{}");
+  const client = JSON.parse(localStorage.getItem("panillo-cliente") || "{}");
   const enderecoIdx = document.querySelector('input[name="endereco"]:checked')?.value || "1";
-  const orderNum = "PAN" + Date.now().toString().slice(-6);
-  const isPE     = Object.values(cart).some(i => i.prod._pe);
+  const isPE = Object.values(cart).some(i => i.prod._pe);
 
-  const order = {
-    numero: orderNum,
-    orderNum,
-    cliente: client,
-    itens: items.map(i => ({
-      prodId: i.prod.id, nome: i.prod.nome, qty: i.qty, preco: i.prod.preco,
+  const btn = document.querySelector('#step-2 .btn-next-step');
+  if (btn) { btn.disabled = true; btn.textContent = "Enviando..."; }
+
+  // ─── Monta payload para o servidor ──────────────────────────────────
+  // O servidor (/api/create-order) recalcula preços a partir de "products"
+  // e valida o cupom (expiração/limite de uso) de forma atômica — os
+  // valores enviados aqui (preco, subtotal, total, desconto) são apenas
+  // referência para a UI local; o servidor é a fonte da verdade.
+  const payload = {
+    items: items.map(i => ({
+      prodId: i.prod.id, qty: i.qty,
       sabores: i.prod.sabores || null, obs: i.prod.obs || null
     })),
-    total,
-    subtotal,
-    descontoAplicado: discPct || null,
-    cupomUsado: activeCoupon?.code || null,
+    cupomCode: activeCoupon?.code || null,
+    cliente: client,
     enderecoIdx,
     tipo: isPE ? "pronta-entrega" : "encomenda",
     dataRetirada: isPE ? new Date().toISOString().split("T")[0] : document.getElementById("f-data").value,
     periodo: document.getElementById("f-periodo").value,
-    pagamento: selectedPay,
-    status: "pendente"
+    pagamento: selectedPay
   };
+
+  let order, orderNum;
   try {
-    await fbAdd("orders", order);
-    addAuditLog(orderNum, `Novo pedido #${orderNum} — ${client.nome||"cliente"} — R$ ${total.toFixed(2)} — ${payLabel(selectedPay)}`, "pedido");
-    await saveClientToFirebase(client, order);
-    // ─── Notificações ───────────────────────────
-    sendOrderNotifications(order).catch(e => console.warn("Notify error:", e));
-    // Nota: o estoque de Pronta Entrega é baixado quando o pedido for marcado como "Entregue"
-    // para garantir precisão e refletir a baixa real no painel do admin.
-    // Handle fiado payment
-    if (selectedPay === "fiado") {
-      await addFiadoDebt(client, order);
+    const resp = await fetch("/api/create-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      if (data?.couponInvalid) {
+        // Cupom ficou inválido entre a aplicação e o envio (expirou/esgotou
+        // por outra venda) — remove o desconto e pede para o cliente
+        // confirmar novamente, em vez de perder o pedido inteiro.
+        activeCoupon = null;
+        const wrap = document.getElementById("coupon-badge-wrap");
+        const discRow = document.getElementById("discount-row");
+        if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">${data.error} — desconto removido. Confirme o pedido novamente.</div>`;
+        if (discRow) discRow.style.display = "none";
+        updateCartUI();
+        renderOrderSummary("order-summary-2");
+        showToast("Cupom não é mais válido — revise e confirme novamente.");
+        if (btn) { btn.disabled = false; btn.textContent = "Confirmar pedido →"; }
+        return;
+      }
+      throw new Error(data?.error || "Erro ao criar pedido");
     }
-    // Registra o uso do cupom (incrementa contador persistido)
-    if (activeCoupon) {
-      try { await incrementCouponUsage(activeCoupon.code); } catch(e) { console.warn("Cupom usage:", e); }
-    }
-  } catch(e) { console.warn("Firebase offline", e); }
+
+    order = data.order;
+    orderNum = order.orderNum;
+  } catch(e) {
+    console.error("create-order falhou:", e);
+    showToast("Não foi possível enviar o pedido. Verifique sua conexão e tente novamente.");
+    if (btn) { btn.disabled = false; btn.textContent = "Confirmar pedido →"; }
+    return;
+  }
+
+  const total = order.total;
+
+  // ─── Notificações (best-effort, não bloqueia a UI) ──────────────────
+  sendOrderNotifications(order).catch(e => console.warn("Notify error:", e));
+  addAuditLog(orderNum, `Novo pedido #${orderNum} — ${client.nome||"cliente"} — R$ ${total.toFixed(2)} — ${payLabel(selectedPay)}`, "pedido");
+  // Nota: o estoque de Pronta Entrega é baixado quando o pedido for marcado como "Entregue"
+  // para garantir precisão e refletir a baixa real no painel do admin.
 
   // Update UI
   currentStep = 3;
@@ -4773,7 +4718,9 @@ async function submitOrder() {
   updateCartUI();
   document.querySelectorAll("[id^='qty-']").forEach(el => el.textContent = 0);
   document.querySelectorAll("[id^='pe-qty-']").forEach(el => el.textContent = 0);
-  loadOrders();
+  // Nota: loadOrders() foi removido daqui — é uma função do painel admin
+  // (atualiza badge/dashboard que não existem na loja pública) e já
+  // falhava silenciosamente neste contexto antes desta alteração.
 }
 
 async function saveClientToFirebase(client, order) {
@@ -4783,96 +4730,63 @@ async function saveClientToFirebase(client, order) {
     return;
   }
   const wppNorm = String(client.wpp).replace(/\D/g,""); // normaliza para só dígitos
+  if (!wppNorm) {
+    console.warn("saveClientToFirebase: WhatsApp inválido", client);
+    return;
+  }
   try {
     if (!db || !FB) throw new Error("Firebase não inicializado");
 
-    // Tenta buscar por wpp normalizado e também pelo valor original
-    let existingDocs = null;
-    try {
-      existingDocs = await FB.getDocs(
-        FB.query(FB.collection(db,"clients"), FB.where("wpp","==",wppNorm))
-      );
-      // Se não achou pelo normalizado, tenta pelo original
-      if (existingDocs.empty && wppNorm !== client.wpp) {
-        existingDocs = await FB.getDocs(
-          FB.query(FB.collection(db,"clients"), FB.where("wpp","==",client.wpp))
-        );
-      }
-    } catch(queryErr) {
-      console.warn("Erro ao buscar cliente:", queryErr);
-      // Se a query falhou, tenta inserir diretamente
-      existingDocs = { empty: true };
-    }
-
-    // Calcula o produto mais pedido (favorito)
+    // ─── ESQUEMA: ID do documento = WhatsApp normalizado ────────────────
+    // As regras do Firestore permitem "create, update" em "clients" sem
+    // autenticação, mas NÃO permitem "read" (read exige admin logado).
+    // Por isso não podemos mais buscar o cliente existente antes de
+    // escrever (FB.getDocs/getDoc falhariam com permission-denied no
+    // checkout público). Usando o WhatsApp normalizado como ID do
+    // documento, conseguimos criar OU atualizar com um único setDoc
+    // (merge: true) + increment(), sem nenhuma leitura prévia — isso é
+    // permitido por "create, update: if true" e preserva o histórico do
+    // cliente em vez de duplicar o registro a cada pedido.
     const novoFavorito = order.itens?.[0]?.nome || "";
 
-    if (existingDocs.empty) {
-      // Novo cliente — cadastra com todos os dados do pedido
-      await FB.addDoc(FB.collection(db,"clients"), {
-        nome:       client.nome,
-        wpp:        wppNorm || client.wpp,
-        email:      client.email || "",
-        bday:       client.bday  || "",
-        obs:        client.obs   || "",
-        pedidos:    1,
-        totalGasto: Number(order.total) || 0,
-        favorito:   novoFavorito,
-        createdAt:  FB.serverTimestamp()
-      });
-      console.log("Novo cliente cadastrado:", client.nome);
-      addAuditLog(wppNorm, `Novo cliente cadastrado — ${client.nome} (${wppNorm})`, "cliente");
-    } else {
-      // Cliente existente — atualiza contadores e favorito
-      const cDoc = existingDocs.docs[0];
-      const data = cDoc.data();
-      const novosPedidos   = (data.pedidos    || 0) + 1;
-      const novoTotalGasto = (data.totalGasto || 0) + (Number(order.total) || 0);
-
-      // Recalcula favorito: conta todos os pedidos do cliente e pega o produto mais frequente
-      // Busca pedidos anteriores para cruzar com o atual
-      const clientOrdersAll = (allOrders || []).filter(o =>
+    // Favorito: se tivermos o histórico de pedidos em memória (contexto
+    // admin/autenticado), recalcula com base em todos os pedidos do
+    // cliente. No checkout público (allOrders vazio), não há como ler o
+    // histórico — o admin pode recalcular o favorito depois pela aba
+    // Clientes, se necessário.
+    let favoritoFinal = novoFavorito;
+    if ((allOrders||[]).length) {
+      const clientOrdersAll = allOrders.filter(o =>
         (o.cliente?.wpp || "").replace(/\D/g,"") === wppNorm && o.status !== "cancelado"
       );
       const prodCount = {};
       [...clientOrdersAll, order].forEach(o =>
         (o.itens||[]).forEach(i => { prodCount[i.nome] = (prodCount[i.nome]||0) + (i.qty||1); })
       );
-      const favoritoFinal = Object.entries(prodCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || novoFavorito;
-
-      await FB.updateDoc(cDoc.ref, {
-        pedidos:    novosPedidos,
-        totalGasto: novoTotalGasto,
-        favorito:   favoritoFinal,
-        // Atualiza dados pessoais se vieram preenchidos no pedido atual
-        ...(client.nome  ? { nome: client.nome }   : {}),
-        ...(client.bday  ? { bday: client.bday }   : {}),
-        ...(client.email ? { email: client.email } : {}),
-        // Garante que o wpp normalizado está salvo
-        wpp: wppNorm || client.wpp
-      });
-      console.log("Cliente atualizado:", client.nome);
-      addAuditLog(wppNorm, `Pedido registrado para ${client.nome} — total R$ ${Number(order.total).toFixed(2)} — pedidos: ${novosPedidos}`, "cliente");
+      favoritoFinal = Object.entries(prodCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || novoFavorito;
     }
+
+    await fbSetMerge("clients", wppNorm, {
+      nome:       client.nome,
+      wpp:        wppNorm,
+      ...(client.email ? { email: client.email } : {}),
+      ...(client.bday  ? { bday:  client.bday  } : {}),
+      ...(client.obs   ? { obs:   client.obs   } : {}),
+      favorito:   favoritoFinal,
+      pedidos:    FB.increment(1),
+      totalGasto: FB.increment(Number(order.total) || 0),
+      lastOrderAt: FB.serverTimestamp()
+      // Nota: não setamos "createdAt" aqui de propósito — com merge:true,
+      // sobrescrever createdAt a cada pedido apagaria a data real de
+      // cadastro do cliente. Documentos novos ficarão sem createdAt
+      // (não crítico); se necessário, o admin pode preenchê-lo manualmente
+      // na primeira vez, ou criar uma Cloud Function que o defina apenas
+      // quando o documento ainda não existir.
+    });
+    console.log("Cliente salvo/atualizado (setDoc merge):", client.nome);
+    addAuditLog(wppNorm, `Pedido registrado para ${client.nome} — total R$ ${Number(order.total).toFixed(2)}`, "cliente");
   } catch(e) {
     console.error("Erro ao salvar cliente no Firebase:", e);
-    // Última tentativa: salva sem verificar duplicata
-    try {
-      if (db && FB) {
-        await FB.addDoc(FB.collection(db,"clients"), {
-          nome:       client.nome,
-          wpp:        wppNorm || client.wpp,
-          email:      client.email || "",
-          bday:       client.bday  || "",
-          pedidos:    1,
-          totalGasto: Number(order.total) || 0,
-          favorito:   order.itens?.[0]?.nome || "",
-          createdAt:  FB.serverTimestamp(),
-          _fallback:  true
-        });
-        console.log("Cliente salvo via fallback:", client.nome);
-      }
-    } catch(e2) { console.error("Fallback também falhou:", e2); }
   }
 }
 
