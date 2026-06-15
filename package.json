@@ -1,0 +1,12 @@
+{
+  "name": "panillo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.0.0"
+  }
+}
