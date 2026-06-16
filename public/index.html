@@ -13,7 +13,7 @@
 <!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { initializeFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, increment }
+  import { initializeFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, increment, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -61,7 +61,7 @@
   window._pixKey    = cfg.pixKey;
   window._fbModules = {
     collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc,
-    query, where, orderBy, serverTimestamp, increment,
+    query, where, orderBy, serverTimestamp, increment, onSnapshot,
     signInWithEmailAndPassword, signOut, onAuthStateChanged
   };
 
@@ -3894,6 +3894,7 @@ window.addEventListener("firebase-ready", () => {
   }
 
   // Observa estado de autenticação — redireciona automaticamente se já logada
+  let _ordersUnsubscribe = null;
   FB.onAuthStateChanged(auth, (user) => {
     if (user) {
       const loginActive = document.getElementById("page-login").classList.contains("active");
@@ -3903,6 +3904,28 @@ window.addEventListener("firebase-ready", () => {
         // loadDashboard será chamado automaticamente dentro de loadOrders()
         showMobBottomNav(true);
       }
+      // Liga o listener em tempo real de pedidos (só roda para admin autenticado,
+      // já que a leitura de "orders" exige auth nas regras do Firestore)
+      if (!_ordersUnsubscribe && db && FB.onSnapshot) {
+        let _prevOrderCount = null;
+        _ordersUnsubscribe = FB.onSnapshot(FB.collection(db, "orders"), (snap) => {
+          const novoTotal = snap.size;
+          // Primeira leitura do listener só define a baseline, não avisa nada
+          if (_prevOrderCount !== null && novoTotal > _prevOrderCount) {
+            showToast("🔔 Novo pedido recebido!");
+          }
+          _prevOrderCount = novoTotal;
+          // Qualquer criação/edição em "orders" (de qualquer dispositivo) dispara isto
+          loadOrders();
+          if (typeof renderOrders === "function") renderOrders();
+        }, (err) => {
+          console.warn("Listener de pedidos em tempo real falhou:", err.message);
+        });
+      }
+    } else if (_ordersUnsubscribe) {
+      // Admin deslogou — desliga o listener para não gastar leituras à toa
+      _ordersUnsubscribe();
+      _ordersUnsubscribe = null;
     }
   });
 
@@ -5062,7 +5085,11 @@ async function updateOrderPayMethod(id, newPay) {
   if (newPay === "fiado" && order.cliente?.wpp) {
     const wpp = order.cliente.wpp.replace(/\D/g,"");
     let accounts = [];
-    try { accounts = await fbGet("fiadoAccounts"); } catch {}
+    try { accounts = await fbGet("fiadoAccounts"); } catch(e) {
+      showToast("⚠️ Não foi possível verificar a conta fiado. Tente novamente.");
+      renderOrders();
+      return;
+    }
     let acc = accounts.find(a => a.clientWpp?.replace(/\D/g,"") === wpp);
     if (!acc) {
       // Create fiado account for this client
@@ -5073,13 +5100,21 @@ async function updateOrderPayMethod(id, newPay) {
         autorizado: true,
         createdAt: new Date().toISOString()
       };
-      try { await fbAdd("fiadoAccounts", novoAcc); } catch {}
-      showToast(`Conta fiado criada para ${order.cliente.nome || "cliente"}`, "success");
+      try {
+        await fbAdd("fiadoAccounts", novoAcc);
+        showToast(`Conta fiado criada para ${order.cliente.nome || "cliente"}`);
+      } catch(e) {
+        showToast(`⚠️ Erro ao criar conta fiado para ${order.cliente.nome || "cliente"}. Verifique sua conexão e tente novamente.`);
+      }
     } else {
       // Add to existing balance
       const novoSaldo = Number(acc.saldo||0) + Number(order.total||0);
-      try { await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo }); } catch {}
-      showToast(`Valor adicionado à conta fiado de ${order.cliente.nome || "cliente"}`, "success");
+      try {
+        await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo });
+        showToast(`Valor adicionado à conta fiado de ${order.cliente.nome || "cliente"}`);
+      } catch(e) {
+        showToast(`⚠️ Erro ao atualizar saldo fiado de ${order.cliente.nome || "cliente"}. O saldo NÃO foi alterado — tente novamente.`);
+      }
     }
   }
   renderOrders();
@@ -5299,8 +5334,12 @@ async function updateOrderStatus(id, newStatus) {
         }
       } catch(e) { console.warn("Erro ao baixar estoque:", e); }
     }
-    try { await fbUpdate("orders", id, { _stockDecremented: true }); } catch(e) {}
-    allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: true } : o);
+    try {
+      await fbUpdate("orders", id, { _stockDecremented: true });
+      allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: true } : o);
+    } catch(e) {
+      console.warn("Erro ao marcar pedido como baixado no estoque — a baixa pode ser repetida na próxima ação:", e);
+    }
     if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
   }
 
@@ -5326,8 +5365,12 @@ async function updateOrderStatus(id, newStatus) {
           }
         } catch(e) { console.warn("Erro ao restaurar estoque:", e); }
       }
-      try { await fbUpdate("orders", id, { _stockDecremented: false }); } catch(e) {}
-      allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: false } : o);
+      try {
+        await fbUpdate("orders", id, { _stockDecremented: false });
+        allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: false } : o);
+      } catch(e) {
+        console.warn("Erro ao marcar pedido como restaurado no estoque — a restauração pode ser repetida na próxima ação:", e);
+      }
       if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
     }
   }
@@ -5587,11 +5630,17 @@ async function reconcileStock() {
   }
 
   // Marca todos os pedidos pendentes como contabilizados
+  const reconciledIds = [];
   for (const order of pending) {
-    try { await fbUpdate("orders", order.id, { _stockDecremented: true }); } catch(e) {}
+    try {
+      await fbUpdate("orders", order.id, { _stockDecremented: true });
+      reconciledIds.push(order.id);
+    } catch(e) {
+      console.warn(`[reconcile] Erro ao marcar pedido ${order.id} como contabilizado — será reprocessado na próxima reconciliação:`, e);
+    }
   }
   allOrders = allOrders.map(o =>
-    pending.some(p => p.id === o.id) ? { ...o, _stockDecremented: true } : o
+    reconciledIds.includes(o.id) ? { ...o, _stockDecremented: true } : o
   );
 
   if (changed) {
@@ -6722,16 +6771,22 @@ async function confirmarBaixa() {
       })
     )
   };
+  let logFalhou = false;
   try {
     await fbAdd("producaoLog", {
       ...entrada,
       itensBrutos: baixaItens,
       createdAt: new Date().toISOString()
     });
-  } catch(e) {}
+  } catch(e) {
+    console.warn("Erro ao salvar histórico de produção:", e);
+    logFalhou = true;
+  }
 
-  if (erros === 0) {
-    showToast("✅ Baixa registrada no estoque!", "success");
+  if (erros === 0 && !logFalhou) {
+    showToast("✅ Baixa registrada no estoque!");
+  } else if (erros === 0 && logFalhou) {
+    showToast("✅ Estoque atualizado — mas o histórico de produção não foi salvo (verifique sua conexão).");
   } else {
     showToast(`⚠️ Baixa parcial — ${erros} ingrediente(s) com erro.`);
   }
@@ -9447,8 +9502,12 @@ async function submitVendaPresencial() {
       } catch(e) { console.warn("VP: erro ao baixar estoque:", e); }
     }
     // Marca o pedido como já descontado
-    try { await fbUpdate("orders", ref, { _stockDecremented: true }); } catch(e) {}
-    allOrders = allOrders.map(o => o.id === ref ? { ...o, _stockDecremented: true } : o);
+    try {
+      await fbUpdate("orders", ref, { _stockDecremented: true });
+      allOrders = allOrders.map(o => o.id === ref ? { ...o, _stockDecremented: true } : o);
+    } catch(e) {
+      console.warn("VP: erro ao marcar pedido como baixado no estoque — pode ser reprocessado depois:", e);
+    }
     if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
 
     closeVendaPresencial();
