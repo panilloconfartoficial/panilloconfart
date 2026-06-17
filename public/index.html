@@ -8,12 +8,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 
 <!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { initializeFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, increment, onSnapshot }
+  import { initializeFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, increment }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -61,7 +60,7 @@
   window._pixKey    = cfg.pixKey;
   window._fbModules = {
     collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc,
-    query, where, orderBy, serverTimestamp, increment, onSnapshot,
+    query, where, orderBy, serverTimestamp, increment,
     signInWithEmailAndPassword, signOut, onAuthStateChanged
   };
 
@@ -1910,17 +1909,7 @@ img { max-width: 100%; display: block; }
         <i class="ti ti-copy"></i> Copiar chave Pix
       </button>
     </div>
-    <div class="footer-right" style="font-size:12px;color:rgba(255,255,255,0.45);display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-      <span style="font-size:11px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;">Nossos meios de contato</span>
-      <a href="mailto:panilloconfart@gmail.com" style="color:rgba(255,255,255,0.45);text-decoration:none;display:flex;align-items:center;gap:5px;font-size:12px;" title="E-mail">
-        <i class="ti ti-mail" style="font-size:13px;color:var(--gold-light);"></i>
-        panilloconfart@gmail.com
-      </a>
-      <a id="footer-wpp-link" href="#" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.45);text-decoration:none;display:flex;align-items:center;gap:5px;font-size:12px;" title="WhatsApp">
-        <i class="ti ti-brand-whatsapp" style="font-size:13px;color:#25D366;"></i>
-        <span id="footer-wpp-text">WhatsApp</span>
-      </a>
-    </div>
+    <div class="footer-right" style="font-size:12px;color:rgba(255,255,255,0.3);">panilloconfart@gmail.com</div>
   </footer>
 </div>
 
@@ -2164,14 +2153,11 @@ img { max-width: 100%; display: block; }
         <div id="success-receipt" style="background:var(--cream);border:1px solid var(--border-mid);border-radius:14px;padding:18px;text-align:left;width:100%;max-width:400px;margin:0 auto 20px;"></div>
 
         <div id="success-pix-box" class="hidden" style="background:#E8F3F3;border:1px solid rgba(15,74,74,0.2);border-radius:12px;padding:14px 18px;width:100%;max-width:400px;margin:0 auto 16px;text-align:left;">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Pix com valor já preenchido — escaneie ou copie o código:</div>
-          <div id="success-pix-qr" style="display:flex;justify-content:center;margin:10px 0;"></div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:2px;">Chave Pix:</div>
-          <div id="success-pix-key" style="font-size:14px;font-weight:500;color:var(--teal-dark);margin-bottom:10px;word-break:break-all;"></div>
-          <button id="success-pix-copy-btn" style="background:var(--teal-dark);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-            <i class="ti ti-copy"></i> Copiar código Pix (com valor)
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Chave Pix para pagamento:</div>
+          <div id="success-pix-key" style="font-size:15px;font-weight:500;color:var(--teal-dark);margin-bottom:8px;"></div>
+          <button onclick="copyPix()" style="background:var(--teal-dark);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <i class="ti ti-copy"></i> Copiar chave Pix
           </button>
-          <div style="font-size:11px;color:var(--muted);margin-top:8px;">Ao escanear o QR ou colar o código no seu banco, o valor já vem preenchido automaticamente.</div>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:400px;margin:0 auto;">
@@ -3491,19 +3477,6 @@ img { max-width: 100%; display: block; }
               <input class="fi" id="cfg-pix" type="text" placeholder="Ex: email@dominio.com ou CPF">
             </div>
           </div>
-          <div class="f2">
-            <div class="fg">
-              <label class="fl">Nome do recebedor (titular da chave Pix)</label>
-              <input class="fi" id="cfg-pix-nome" type="text" maxlength="25" placeholder="Ex: Panillo ou seu nome completo">
-            </div>
-            <div class="fg">
-              <label class="fl">Cidade do recebedor</label>
-              <input class="fi" id="cfg-pix-cidade" type="text" maxlength="15" placeholder="Ex: Fortaleza">
-            </div>
-          </div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
-            Nome e cidade são exigidos pelo padrão do Banco Central para gerar o QR Code do Pix com valor já preenchido. Use o nome exatamente como está cadastrado na sua chave Pix.
-          </div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
             <strong>Cálculo do lucro:</strong> Faturamento − Custo ingredientes − Custos invisíveis = Lucro real
           </div>
@@ -3881,20 +3854,7 @@ window.addEventListener("firebase-ready", () => {
   WPP_NUMBER = window._wppNumber || "";
   PIX_KEY    = window._pixKey    || "";
 
-  // Popula link e texto do WhatsApp no rodapé
-  const footerWppLink = document.getElementById("footer-wpp-link");
-  const footerWppText = document.getElementById("footer-wpp-text");
-  if (footerWppLink && WPP_NUMBER) {
-    footerWppLink.href = `https://wa.me/${WPP_NUMBER}`;
-    if (footerWppText) {
-      const n = WPP_NUMBER.replace(/\D/g, "");
-      const match = n.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
-      footerWppText.textContent = match ? `(${match[1]}) ${match[2]}-${match[3]}` : WPP_NUMBER;
-    }
-  }
-
   // Observa estado de autenticação — redireciona automaticamente se já logada
-  let _ordersUnsubscribe = null;
   FB.onAuthStateChanged(auth, (user) => {
     if (user) {
       const loginActive = document.getElementById("page-login").classList.contains("active");
@@ -3904,28 +3864,6 @@ window.addEventListener("firebase-ready", () => {
         // loadDashboard será chamado automaticamente dentro de loadOrders()
         showMobBottomNav(true);
       }
-      // Liga o listener em tempo real de pedidos (só roda para admin autenticado,
-      // já que a leitura de "orders" exige auth nas regras do Firestore)
-      if (!_ordersUnsubscribe && db && FB.onSnapshot) {
-        let _prevOrderCount = null;
-        _ordersUnsubscribe = FB.onSnapshot(FB.collection(db, "orders"), (snap) => {
-          const novoTotal = snap.size;
-          // Primeira leitura do listener só define a baseline, não avisa nada
-          if (_prevOrderCount !== null && novoTotal > _prevOrderCount) {
-            showToast("🔔 Novo pedido recebido!");
-          }
-          _prevOrderCount = novoTotal;
-          // Qualquer criação/edição em "orders" (de qualquer dispositivo) dispara isto
-          loadOrders();
-          if (typeof renderOrders === "function") renderOrders();
-        }, (err) => {
-          console.warn("Listener de pedidos em tempo real falhou:", err.message);
-        });
-      }
-    } else if (_ordersUnsubscribe) {
-      // Admin deslogou — desliga o listener para não gastar leituras à toa
-      _ordersUnsubscribe();
-      _ordersUnsubscribe = null;
     }
   });
 
@@ -5085,11 +5023,7 @@ async function updateOrderPayMethod(id, newPay) {
   if (newPay === "fiado" && order.cliente?.wpp) {
     const wpp = order.cliente.wpp.replace(/\D/g,"");
     let accounts = [];
-    try { accounts = await fbGet("fiadoAccounts"); } catch(e) {
-      showToast("⚠️ Não foi possível verificar a conta fiado. Tente novamente.");
-      renderOrders();
-      return;
-    }
+    try { accounts = await fbGet("fiadoAccounts"); } catch {}
     let acc = accounts.find(a => a.clientWpp?.replace(/\D/g,"") === wpp);
     if (!acc) {
       // Create fiado account for this client
@@ -5100,21 +5034,13 @@ async function updateOrderPayMethod(id, newPay) {
         autorizado: true,
         createdAt: new Date().toISOString()
       };
-      try {
-        await fbAdd("fiadoAccounts", novoAcc);
-        showToast(`Conta fiado criada para ${order.cliente.nome || "cliente"}`);
-      } catch(e) {
-        showToast(`⚠️ Erro ao criar conta fiado para ${order.cliente.nome || "cliente"}. Verifique sua conexão e tente novamente.`);
-      }
+      try { await fbAdd("fiadoAccounts", novoAcc); } catch {}
+      showToast(`Conta fiado criada para ${order.cliente.nome || "cliente"}`, "success");
     } else {
       // Add to existing balance
       const novoSaldo = Number(acc.saldo||0) + Number(order.total||0);
-      try {
-        await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo });
-        showToast(`Valor adicionado à conta fiado de ${order.cliente.nome || "cliente"}`);
-      } catch(e) {
-        showToast(`⚠️ Erro ao atualizar saldo fiado de ${order.cliente.nome || "cliente"}. O saldo NÃO foi alterado — tente novamente.`);
-      }
+      try { await fbUpdate("fiadoAccounts", acc.id, { saldo: novoSaldo }); } catch {}
+      showToast(`Valor adicionado à conta fiado de ${order.cliente.nome || "cliente"}`, "success");
     }
   }
   renderOrders();
@@ -5334,12 +5260,8 @@ async function updateOrderStatus(id, newStatus) {
         }
       } catch(e) { console.warn("Erro ao baixar estoque:", e); }
     }
-    try {
-      await fbUpdate("orders", id, { _stockDecremented: true });
-      allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: true } : o);
-    } catch(e) {
-      console.warn("Erro ao marcar pedido como baixado no estoque — a baixa pode ser repetida na próxima ação:", e);
-    }
+    try { await fbUpdate("orders", id, { _stockDecremented: true }); } catch(e) {}
+    allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: true } : o);
     if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
   }
 
@@ -5365,12 +5287,8 @@ async function updateOrderStatus(id, newStatus) {
           }
         } catch(e) { console.warn("Erro ao restaurar estoque:", e); }
       }
-      try {
-        await fbUpdate("orders", id, { _stockDecremented: false });
-        allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: false } : o);
-      } catch(e) {
-        console.warn("Erro ao marcar pedido como restaurado no estoque — a restauração pode ser repetida na próxima ação:", e);
-      }
+      try { await fbUpdate("orders", id, { _stockDecremented: false }); } catch(e) {}
+      allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: false } : o);
       if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
     }
   }
@@ -5630,17 +5548,11 @@ async function reconcileStock() {
   }
 
   // Marca todos os pedidos pendentes como contabilizados
-  const reconciledIds = [];
   for (const order of pending) {
-    try {
-      await fbUpdate("orders", order.id, { _stockDecremented: true });
-      reconciledIds.push(order.id);
-    } catch(e) {
-      console.warn(`[reconcile] Erro ao marcar pedido ${order.id} como contabilizado — será reprocessado na próxima reconciliação:`, e);
-    }
+    try { await fbUpdate("orders", order.id, { _stockDecremented: true }); } catch(e) {}
   }
   allOrders = allOrders.map(o =>
-    reconciledIds.includes(o.id) ? { ...o, _stockDecremented: true } : o
+    pending.some(p => p.id === o.id) ? { ...o, _stockDecremented: true } : o
   );
 
   if (changed) {
@@ -6771,22 +6683,16 @@ async function confirmarBaixa() {
       })
     )
   };
-  let logFalhou = false;
   try {
     await fbAdd("producaoLog", {
       ...entrada,
       itensBrutos: baixaItens,
       createdAt: new Date().toISOString()
     });
-  } catch(e) {
-    console.warn("Erro ao salvar histórico de produção:", e);
-    logFalhou = true;
-  }
+  } catch(e) {}
 
-  if (erros === 0 && !logFalhou) {
-    showToast("✅ Baixa registrada no estoque!");
-  } else if (erros === 0 && logFalhou) {
-    showToast("✅ Estoque atualizado — mas o histórico de produção não foi salvo (verifique sua conexão).");
+  if (erros === 0) {
+    showToast("✅ Baixa registrada no estoque!", "success");
   } else {
     showToast(`⚠️ Baixa parcial — ${erros} ingrediente(s) com erro.`);
   }
@@ -7712,8 +7618,6 @@ async function loadConfig() {
     document.getElementById("cfg-logo").value    = cfg.logo     || "";
     document.getElementById("cfg-overhead").value= cfg.overhead || "20";
     document.getElementById("cfg-pix").value     = cfg.pix      || "";
-    document.getElementById("cfg-pix-nome").value   = cfg.pixNome   || "";
-    document.getElementById("cfg-pix-cidade").value = cfg.pixCidade || "";
     document.getElementById("cfg-periods").value = (cfg.periods || ["Manhã (9h–12h)","Tarde (13h–18h)"]).join("\n");
     document.getElementById("cfg-capacity").value= cfg.capacity || "";
     renderCouponsList();
@@ -7742,8 +7646,6 @@ async function saveConfig() {
     logo:     document.getElementById("cfg-logo")?.value.trim()     || existing.logo     || "",
     overhead: document.getElementById("cfg-overhead")?.value        || existing.overhead || "20",
     pix:      document.getElementById("cfg-pix")?.value.trim()      || existing.pix      || "",
-    pixNome:    document.getElementById("cfg-pix-nome")?.value.trim()   || existing.pixNome   || "",
-    pixCidade:  document.getElementById("cfg-pix-cidade")?.value.trim() || existing.pixCidade || "",
     periods:  periods.length ? periods : (existing.periods || ["Manhã (9h–12h)","Tarde (13h–18h)"]),
     capacity: document.getElementById("cfg-capacity")?.value        || existing.capacity || "",
     coupons:  existing.coupons || [],
@@ -8348,90 +8250,6 @@ function closeClientDetail() {
   _cdClientId = null;
 }
 
-// ─── PIX BR CODE (EMV) — payload dinâmico com valor fixo ──
-// Monta o "Pix Copia e Cola" / QR Code seguindo o padrão do Banco Central (EMV/TLV).
-// Não depende de nenhum serviço externo: é só uma string formatada + checksum CRC16.
-
-function _pixTLV(id, value) {
-  const len = String(value.length).padStart(2, "0");
-  return `${id}${len}${value}`;
-}
-
-function _pixCRC16(payload) {
-  // CRC16-CCITT (polinômio 0x1021), exigido pelo padrão Pix no campo final "63"
-  let crc = 0xFFFF;
-  for (let i = 0; i < payload.length; i++) {
-    crc ^= payload.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) {
-      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
-      crc &= 0xFFFF;
-    }
-  }
-  return crc.toString(16).toUpperCase().padStart(4, "0");
-}
-
-// Remove acentos e caracteres fora do padrão aceito pelo Pix (alfanumérico simples)
-function _pixSanitize(str, maxLen) {
-  const clean = (str || "")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
-    .replace(/[^a-zA-Z0-9 ]/g, "")                      // só letras/números/espaço
-    .trim();
-  return clean.slice(0, maxLen);
-}
-
-/**
- * Gera o payload Pix (BR Code) com valor fixo.
- * @param {string} chave   - chave Pix estática (e-mail, CPF, telefone ou aleatória)
- * @param {string} nome    - nome do recebedor/titular (máx 25 caracteres, exigência do Bacen)
- * @param {string} cidade  - cidade do recebedor (máx 15 caracteres)
- * @param {number} valor   - valor em reais (ex: 49.90)
- * @param {string} txid    - identificador da transação (ex: número do pedido), até 25 chars alfanuméricos
- */
-function gerarPixPayload(chave, nome, cidade, valor, txid) {
-  const merchantName = _pixSanitize(nome, 25) || "PANILLO";
-  const merchantCity = _pixSanitize(cidade, 15) || "FORTALEZA";
-  const txidClean    = _pixSanitize(txid, 25).replace(/\s/g, "") || "***";
-
-  const merchantAccountInfo =
-    _pixTLV("00", "br.gov.bcb.pix") +
-    _pixTLV("01", chave);
-
-  const additionalDataField = _pixTLV("05", txidClean);
-
-  let payload =
-    _pixTLV("00", "01") +                                   // Payload Format Indicator
-    _pixTLV("26", merchantAccountInfo) +                    // Merchant Account Info (Pix)
-    _pixTLV("52", "0000") +                                  // Merchant Category Code
-    _pixTLV("53", "986") +                                   // Transaction Currency (BRL)
-    (valor > 0 ? _pixTLV("54", valor.toFixed(2)) : "") +     // Transaction Amount
-    _pixTLV("58", "BR") +                                     // Country Code
-    _pixTLV("59", merchantName) +                             // Merchant Name
-    _pixTLV("60", merchantCity) +                             // Merchant City
-    _pixTLV("62", additionalDataField) +                      // Additional Data Field (TXID)
-    "6304";                                                   // CRC placeholder
-
-  payload += _pixCRC16(payload);
-  return payload;
-}
-
-// Renderiza o QR Code (canvas) dentro do elemento alvo, a partir do payload Pix
-function renderPixQRCode(elementId, payload) {
-  const el = document.getElementById(elementId);
-  if (!el || typeof QRCode === "undefined") return;
-  el.innerHTML = "";
-  QRCode.toCanvas(document.createElement("canvas"), payload, { width: 200, margin: 1 }, (err, canvas) => {
-    if (err) { console.warn("Pix QR: erro ao gerar", err); return; }
-    el.appendChild(canvas);
-  });
-}
-
-// Copia o código Pix completo (copia-e-cola) com valor já embutido
-function copyPixPayload(payload) {
-  navigator.clipboard.writeText(payload).then(() => showToast("Código Pix copiado! Cole no app do seu banco.")).catch(() => {
-    prompt("Copie o código Pix:", payload);
-  });
-}
-
 // ─── PIX COPY ──────────────────────────────────────────
 function copyPix() {
   const key = PIX_KEY || "panilloconfart@gmail.com";
@@ -8491,15 +8309,7 @@ function buildReceipt(order, orderNum) {
     if (order.pagamento === "pix") {
       pixBox.classList.remove("hidden");
       const pixKeyEl = document.getElementById("success-pix-key");
-      const key = PIX_KEY || "panilloconfart@gmail.com";
-      if (pixKeyEl) pixKeyEl.textContent = key;
-
-      const merchantName = cfg.pixNome  || "Panillo";
-      const merchantCity = cfg.pixCidade || "Fortaleza";
-      const payload = gerarPixPayload(key, merchantName, merchantCity, total, orderNum || order.id);
-      renderPixQRCode("success-pix-qr", payload);
-      const copyBtn = document.getElementById("success-pix-copy-btn");
-      if (copyBtn) copyBtn.onclick = () => copyPixPayload(payload);
+      if (pixKeyEl) pixKeyEl.textContent = PIX_KEY || "panilloconfart@gmail.com";
     } else {
       pixBox.classList.add("hidden");
     }
@@ -9213,7 +9023,7 @@ function vpSetTipo(tipo) {
       : Number(prod.preco);
     return { ...item, preco: novoPreco };
   });
-  renderVpItems();
+  vpRenderItems();
   vpCalcTotal();
 }
 
@@ -9502,12 +9312,8 @@ async function submitVendaPresencial() {
       } catch(e) { console.warn("VP: erro ao baixar estoque:", e); }
     }
     // Marca o pedido como já descontado
-    try {
-      await fbUpdate("orders", ref, { _stockDecremented: true });
-      allOrders = allOrders.map(o => o.id === ref ? { ...o, _stockDecremented: true } : o);
-    } catch(e) {
-      console.warn("VP: erro ao marcar pedido como baixado no estoque — pode ser reprocessado depois:", e);
-    }
+    try { await fbUpdate("orders", ref, { _stockDecremented: true }); } catch(e) {}
+    allOrders = allOrders.map(o => o.id === ref ? { ...o, _stockDecremented: true } : o);
     if (stockChanged) { renderStockAdmin(); renderPEProducts(); }
 
     closeVendaPresencial();
