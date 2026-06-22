@@ -3958,6 +3958,14 @@ window.addEventListener("firebase-ready", () => {
   });
 });
 
+// Converte preço/unidade do ingrediente para preço/grama (ou preço/ml, tratado como equivalente)
+// kg e L são convertidos (÷1000) assumindo densidade ~1 para líquidos; g e ml não precisam conversão.
+function precoPorGrama(ing) {
+  const preco = Number(ing.preco) || 0;
+  if (ing.unit === "kg" || ing.unit === "L") return preco / 1000;
+  return preco; // g, ml, unidade
+}
+
 function escHtml(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
@@ -6339,7 +6347,7 @@ function recalcCost() {
     const costEl = row.querySelector("input[readonly]");
     const ing = allIngredients.find(i => i.id === sel.value);
     if (ing && grams) {
-      const pricePerG = ing.unit === "kg" ? ing.preco / 1000 : ing.preco;
+      const pricePerG = precoPorGrama(ing);
       const cost = pricePerG * grams;
       costEl.value = `R$ ${cost.toFixed(3)}`;
       total += cost;
@@ -6468,7 +6476,7 @@ function renderIngredients() {
     ? `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted);">Nenhum ingrediente cadastrado. Clique em "+ Ingrediente".</td></tr>`
     : allIngredients.map(i => {
         const ok = i.estoque >= (i.min || 0);
-        const pricePerG = i.unit === "kg" ? (i.preco/1000) : i.preco;
+        const pricePerG = precoPorGrama(i);
         // Validade
         let validadeHtml = `<span style="color:var(--muted);font-size:11px;">—</span>`;
         if (i.validade) {
@@ -6489,6 +6497,7 @@ function renderIngredients() {
           <td><span class="${ok?'stock-ok':'stock-low'}">${ok?'OK':'Baixo'}</span></td>
           <td><div class="ing-actions">
             <button class="ing-act-btn" onclick="openIngModal('${i.id}')">Editar</button>
+            <button class="ing-act-btn" style="color:#E24B4A;" onclick="deleteIngredient('${i.id}','${escHtml(i.nome)}')">Excluir</button>
           </div></td>
         </tr>`;
       }).join("");
@@ -6508,7 +6517,7 @@ function renderRecipes() {
     const rows = (p.ingredientes||[]).map(pi => {
       const ing = allIngredients.find(i => i.id === pi.ingId);
       if (!ing) return "";
-      const pricePerG = ing.unit === "kg" ? ing.preco/1000 : ing.preco;
+      const pricePerG = precoPorGrama(ing);
       const cost = pricePerG * pi.grams;
       totalCost += cost;
       return `<div class="rc-row"><span class="rc-ing">${ing.nome}</span><span class="rc-gram">${pi.grams}g</span><span class="rc-cost">R$ ${cost.toFixed(2)}</span></div>`;
@@ -6570,6 +6579,20 @@ function openIngModal(id) {
     document.getElementById("ing-modal-title").textContent = "Novo ingrediente";
   }
   document.getElementById("ing-modal").classList.add("open");
+}
+
+async function deleteIngredient(id, nome) {
+  const usadoEm = (allProducts || []).filter(p => (p.ingredientes||[]).some(pi => pi.ingId === id)).map(p => p.nome);
+  let msg = `Excluir "${nome}" permanentemente? Esta ação não pode ser desfeita.`;
+  if (usadoEm.length) msg += `\n\nAtenção: usado na(s) receita(s): ${usadoEm.join(", ")}. O custo dessas receitas vai parar de considerar este ingrediente.`;
+  if (!confirm(msg)) return;
+  try {
+    const { deleteDoc, doc: fbDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    await deleteDoc(fbDoc(db, "ingredients", id));
+  } catch(e) { console.warn("Firebase delete error:", e); }
+  allIngredients = allIngredients.filter(i => i.id !== id);
+  renderIngredients();
+  showToast("Ingrediente excluído!");
 }
 
 function closeIngModal() { document.getElementById("ing-modal").classList.remove("open"); }
@@ -7450,7 +7473,7 @@ function getBusinessContext() {
 }
 
 // ─── ENGINE DE PRECIFICAÇÃO & PLANEJAMENTO (fonte única de verdade) ──────────
-function _plPricePerG(ing){ return ing.unit === "kg" ? (Number(ing.preco)||0)/1000 : (Number(ing.preco)||0); }
+function _plPricePerG(ing){ return precoPorGrama(ing); }
 
 function _planCfg(){
   let saved = {};
@@ -8920,7 +8943,7 @@ async function loadIndicadores(mode) {
     prod.ingredientes.forEach(pi => {
       const ing = allIngredients.find(i => i.id === pi.ingId);
       if (!ing) return;
-      const pricePerG = ing.unit === "kg" ? ing.preco/1000 : ing.preco;
+      const pricePerG = precoPorGrama(ing);
       totalCost += pricePerG * pi.grams;
     });
     const withExtra = totalCost * 1.15;
