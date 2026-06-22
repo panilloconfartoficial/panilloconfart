@@ -2259,7 +2259,17 @@ img { max-width: 100%; display: block; }
       <div class="f2">
         <div class="fg">
           <label class="fl">Rendimento (unidades)</label>
-          <input class="fi" id="pm-rend" type="number" placeholder="Ex: 12">
+          <input class="fi" id="pm-rend" type="number" placeholder="Ex: 12" oninput="recalcCost()">
+        </div>
+      </div>
+      <div class="f2" style="margin-bottom:13px;">
+        <div class="fg">
+          <label class="fl">⏱️ Tempo de preparo <span style="font-size:10px;color:var(--muted);font-weight:400;">(min/lote)</span></label>
+          <input class="fi" id="pm-tempo-preparo" type="number" min="0" placeholder="Ex: 30" oninput="recalcCost()">
+        </div>
+        <div class="fg">
+          <label class="fl">📦 Tempo de embalagem <span style="font-size:10px;color:var(--muted);font-weight:400;">(min/lote)</span></label>
+          <input class="fi" id="pm-tempo-embalagem" type="number" min="0" placeholder="Ex: 15" oninput="recalcCost()">
         </div>
       </div>
       <!-- Campos exclusivos do COMBO -->
@@ -6259,6 +6269,8 @@ function openProdModal(id) {
       document.getElementById("pm-preco").value = p.preco;
       document.getElementById("pm-preco-revenda").value = p.precoRevenda || "";
       document.getElementById("pm-rend").value  = p.rendimento || "";
+      document.getElementById("pm-tempo-preparo").value   = p.tempoPreparoMin  || "";
+      document.getElementById("pm-tempo-embalagem").value = p.tempoEmbalagemMin || "";
       document.getElementById("pm-title").textContent = "Editar produto";
       if (p.ingredientes) p.ingredientes.forEach(i => addIngRow(i));
       // Restaura foto e enquadramento existentes
@@ -6283,6 +6295,8 @@ function openProdModal(id) {
     document.getElementById("pm-preco").value = "";
     document.getElementById("pm-preco-revenda").value = "";
     document.getElementById("pm-rend").value  = "";
+    document.getElementById("pm-tempo-preparo").value   = "";
+    document.getElementById("pm-tempo-embalagem").value = "";
     document.getElementById("pm-title").textContent = "Novo produto";
     addIngRow();
   }
@@ -6335,8 +6349,13 @@ function recalcCost() {
   const _vh = _c.horas > 0 ? _c.proLabore/_c.horas : 0;
   const rend = parseInt(document.getElementById("pm-rend").value) || 1;
   const preco = parseFloat(document.getElementById("pm-preco").value) || 0;
+  const tempoPreparoModal   = parseInt(document.getElementById("pm-tempo-preparo").value)   || 0;
+  const tempoEmbalagemModal = parseInt(document.getElementById("pm-tempo-embalagem").value) || 0;
+  const tempoAtivo = (tempoPreparoModal + tempoEmbalagemModal) > 0
+    ? (tempoPreparoModal + tempoEmbalagemModal)
+    : _c.tempo;
   const ingUn = (total/rend) * (1 + _c.perda);
-  const laborUn = (_c.tempo/rend) * _vh/60;
+  const laborUn = (tempoAtivo/rend) * _vh/60;
   const costPerUnit = ingUn + laborUn;
   const cmUn = preco*(1 - _c.cartao) - ingUn - laborUn;
   const cmPct = preco > 0 ? (cmUn/preco*100) : 0;
@@ -6373,6 +6392,8 @@ async function saveProduct() {
     precoRevenda: precoRevenda,
     categoria:     cat,
     rendimento:    parseInt(document.getElementById("pm-rend").value) || 1,
+    tempoPreparoMin:   parseInt(document.getElementById("pm-tempo-preparo").value)   || 0,
+    tempoEmbalagemMin: parseInt(document.getElementById("pm-tempo-embalagem").value) || 0,
     emoji:         isCombo ? "🎁" : cat === "brownie" ? "🍫" : "🍪",
     ingredientes,
     badge: "",
@@ -6496,7 +6517,13 @@ function renderRecipes() {
     const _c = _planCfg();
     const _vh = _c.horas > 0 ? _c.proLabore/_c.horas : 0;
     const ingUn   = (totalCost/rend) * (1 + _c.perda);
-    const laborUn = (_c.tempo/rend) * _vh/60;
+    const tempoAtivoProd = ((Number(p.tempoPreparoMin)||0) + (Number(p.tempoEmbalagemMin)||0)) > 0
+      ? (Number(p.tempoPreparoMin)||0) + (Number(p.tempoEmbalagemMin)||0)
+      : _c.tempo;
+    const laborUn = (tempoAtivoProd/rend) * _vh/60;
+    const tempoLabel = ((Number(p.tempoPreparoMin)||0) + (Number(p.tempoEmbalagemMin)||0)) > 0
+      ? `${tempoAtivoProd}min (${Number(p.tempoPreparoMin)||0}min preparo + ${Number(p.tempoEmbalagemMin)||0}min embalagem)`
+      : `${tempoAtivoProd}min (global)`;
     const custoUn = ingUn + laborUn;
     const cmUn    = (p.preco||0)*(1 - _c.cartao) - ingUn - laborUn;
     const cmPct   = p.preco > 0 ? (cmUn/p.preco*100) : 0;
@@ -6507,7 +6534,7 @@ function renderRecipes() {
       <div class="rc-body">${rows || '<div style="padding:8px;color:var(--muted);font-size:12px;">Sem ingredientes</div>'}</div>
       <div class="rc-footer">
         <div class="rc-f-row"><span class="rc-f-lbl">Ingrediente / un (c/ ${Math.round(_c.perda*100)}% perda)</span><span class="rc-f-val">R$ ${ingUn.toFixed(2)}</span></div>
-        <div class="rc-f-row"><span class="rc-f-lbl">Mão de obra / un</span><span class="rc-f-val">R$ ${laborUn.toFixed(2)}</span></div>
+        <div class="rc-f-row"><span class="rc-f-lbl">Mão de obra / un <span style="font-size:10px;color:var(--muted);">(${tempoLabel})</span></span><span class="rc-f-val">R$ ${laborUn.toFixed(2)}</span></div>
         <div class="rc-f-row"><span class="rc-f-lbl">Custo real / un</span><span class="rc-f-val">R$ ${custoUn.toFixed(2)}</span></div>
         <div class="rc-profit-row">
           <span class="rc-profit-lbl">Margem de contribuição / un</span>
@@ -7453,7 +7480,10 @@ function computePlano(){
       if (ing) ingReceita += _plPricePerG(ing) * (Number(pi.grams)||0);
     });
     const ingUn   = (ingReceita/rend) * (1 + c.perda);
-    const laborUn = (c.tempo/rend) * valorHora / 60;
+    const tempoAtivoProd = ((Number(p.tempoPreparoMin)||0) + (Number(p.tempoEmbalagemMin)||0)) > 0
+      ? (Number(p.tempoPreparoMin)||0) + (Number(p.tempoEmbalagemMin)||0)
+      : c.tempo;
+    const laborUn = (tempoAtivoProd/rend) * valorHora / 60;
     const preco   = Number(p.preco) || 0;
     const cmUn    = preco*(1 - c.cartao) - ingUn - laborUn;
     return { id:p.id, nome:p.nome, emoji:p.emoji||"🍪", rend, preco, ingUn, laborUn, custoUn:ingUn+laborUn, cmUn, cmRec:cmUn*rend };
