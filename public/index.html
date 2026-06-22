@@ -2428,6 +2428,10 @@ img { max-width: 100%; display: block; }
       <i class="ti ti-chart-bar sb-icon"></i>
       <span class="sb-label">Indicadores</span>
     </div>
+    <div class="sb-item" onclick="showAdminSection('planejamento',this)">
+      <i class="ti ti-clipboard-check sb-icon"></i>
+      <span class="sb-label">Planejamento do Mês</span>
+    </div>
     <div class="sb-item" onclick="showAdminSection('metas',this)">
       <i class="ti ti-target sb-icon"></i>
       <span class="sb-label">Metas & Lucro</span>
@@ -2951,6 +2955,57 @@ img { max-width: 100%; display: block; }
             <tbody id="clients-tbody"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ── PLANEJAMENTO DO MÊS ── -->
+    <div id="sec-planejamento" class="hidden">
+      <div class="admin-topbar">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
+          <div class="admin-page-title">Planejamento do Mês</div>
+        </div>
+        <div class="topbar-right">
+          <button class="btn-sm-outline" onclick="exportPlanoCSV()">Exportar lista de compras</button>
+        </div>
+      </div>
+      <div class="admin-content">
+
+        <div class="admin-card" style="margin-bottom:16px;">
+          <div class="ac-title" style="margin-bottom:4px;">Quanto você quer tirar este mês</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Mexa nos dois campos abaixo. O resto é calculado automaticamente a partir dos seus produtos e ingredientes cadastrados.</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;">
+            <div>
+              <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Pró-labore (seu salário) R$</label>
+              <input class="fi" id="pl-prolabore" type="number" min="0" step="50" value="2500" oninput="recalcPlano()">
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Reserva de emergência R$/mês</label>
+              <input class="fi" id="pl-reserva" type="number" min="0" step="50" value="0" oninput="recalcPlano()">
+            </div>
+          </div>
+          <div style="margin-top:14px;">
+            <div onclick="document.getElementById('pl-premissas').classList.toggle('hidden')" style="cursor:pointer;font-size:13px;color:var(--gold);display:flex;align-items:center;gap:6px;">
+              <i class="ti ti-adjustments-horizontal"></i> Premissas (custos fixos do negócio) — ajuste uma vez e esqueça
+            </div>
+            <div id="pl-premissas" class="hidden" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+              <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Água, luz e gás R$/mês</label><input class="fi" id="pl-contas" type="number" min="0" step="10" value="200" oninput="recalcPlano()"></div>
+              <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Taxa do cartão %</label><input class="fi" id="pl-cartao" type="number" min="0" step="0.01" value="3.09" oninput="recalcPlano()"></div>
+              <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Horas trabalhadas /mês</label><input class="fi" id="pl-horas" type="number" min="1" step="1" value="160" oninput="recalcPlano()"></div>
+              <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Tempo ativo /receita (min)</label><input class="fi" id="pl-tempo" type="number" min="1" step="1" value="55" oninput="recalcPlano()"></div>
+              <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Perda/desperdício %</label><input class="fi" id="pl-perda" type="number" min="0" step="1" value="5" oninput="recalcPlano()"></div>
+              <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Capacidade (receitas/mês)</label><input class="fi" id="pl-capacidade" type="number" min="1" step="1" value="80" oninput="recalcPlano()"></div>
+            </div>
+          </div>
+          <div style="margin-top:14px;"><button class="btn-sm-outline" onclick="savePlanejamento()"><i class="ti ti-device-floppy"></i> Salvar premissas</button></div>
+        </div>
+
+        <div id="pl-resumo"></div>
+        <div id="pl-aviso"></div>
+        <div id="pl-produtos" style="margin-top:16px;"></div>
+        <div id="pl-semanal" style="margin-top:16px;"></div>
+        <div id="pl-compras" style="margin-top:16px;"></div>
+
       </div>
     </div>
 
@@ -4022,6 +4077,7 @@ function showAdminSection(sec, el) {
   }
   if (sec === "depoimentos") renderDepoimentosAdmin();
   if (sec === "metas")       loadMetas();
+  if (sec === "planejamento") loadPlanejamento();
   if (sec === "fluxo") {
     const today = new Date().toISOString().split("T")[0];
     const d30   = new Date(); d30.setDate(d30.getDate()-30);
@@ -6275,13 +6331,17 @@ function recalcCost() {
       total += cost;
     } else { costEl.value = ""; }
   });
-  const withExtra = total * 1.15;
+  const _c = _planCfg();
+  const _vh = _c.horas > 0 ? _c.proLabore/_c.horas : 0;
   const rend = parseInt(document.getElementById("pm-rend").value) || 1;
   const preco = parseFloat(document.getElementById("pm-preco").value) || 0;
-  const costPerUnit = withExtra / rend;
-  const margem = preco > 0 ? ((preco - costPerUnit) / preco * 100) : 0;
+  const ingUn = (total/rend) * (1 + _c.perda);
+  const laborUn = (_c.tempo/rend) * _vh/60;
+  const costPerUnit = ingUn + laborUn;
+  const cmUn = preco*(1 - _c.cartao) - ingUn - laborUn;
+  const cmPct = preco > 0 ? (cmUn/preco*100) : 0;
   document.getElementById("pm-custo-est").textContent = costPerUnit > 0 ? `R$ ${costPerUnit.toFixed(2)}` : "—";
-  document.getElementById("pm-margem-est").textContent = margem > 0 ? `${margem.toFixed(0)}%` : "—";
+  document.getElementById("pm-margem-est").textContent = preco > 0 ? `${cmPct.toFixed(0)}%` : "—";
 }
 
 async function saveProduct() {
@@ -6432,25 +6492,31 @@ function renderRecipes() {
       totalCost += cost;
       return `<div class="rc-row"><span class="rc-ing">${ing.nome}</span><span class="rc-gram">${pi.grams}g</span><span class="rc-cost">R$ ${cost.toFixed(2)}</span></div>`;
     }).join("");
-    const withExtra = totalCost * 1.15;
     const rend = p.rendimento || 1;
-    const perUnit = withExtra / rend;
-    const margem = p.preco > 0 ? ((p.preco - perUnit)/p.preco*100) : 0;
+    const _c = _planCfg();
+    const _vh = _c.horas > 0 ? _c.proLabore/_c.horas : 0;
+    const ingUn   = (totalCost/rend) * (1 + _c.perda);
+    const laborUn = (_c.tempo/rend) * _vh/60;
+    const custoUn = ingUn + laborUn;
+    const cmUn    = (p.preco||0)*(1 - _c.cartao) - ingUn - laborUn;
+    const cmPct   = p.preco > 0 ? (cmUn/p.preco*100) : 0;
+    const sugDen  = 1 - 0.30 - _c.cartao;
+    const sugerido = sugDen > 0 ? custoUn/sugDen : 0;
     return `<div class="recipe-card">
       <div class="rc-header"><span class="rc-name">${p.nome}</span><span class="rc-emoji">${p.emoji||"🍪"}</span></div>
       <div class="rc-body">${rows || '<div style="padding:8px;color:var(--muted);font-size:12px;">Sem ingredientes</div>'}</div>
       <div class="rc-footer">
-        <div class="rc-f-row"><span class="rc-f-lbl">Ingredientes</span><span class="rc-f-val">R$ ${totalCost.toFixed(2)}</span></div>
-        <div class="rc-f-row"><span class="rc-f-lbl">+ 15% invisíveis</span><span class="rc-f-val">R$ ${(totalCost*0.15).toFixed(2)}</span></div>
-        <div class="rc-f-row"><span class="rc-f-lbl">Custo total (${rend} un.)</span><span class="rc-f-val">R$ ${withExtra.toFixed(2)}</span></div>
-        <div class="rc-f-row"><span class="rc-f-lbl">Custo por unidade</span><span class="rc-f-val">R$ ${perUnit.toFixed(2)}</span></div>
+        <div class="rc-f-row"><span class="rc-f-lbl">Ingrediente / un (c/ ${Math.round(_c.perda*100)}% perda)</span><span class="rc-f-val">R$ ${ingUn.toFixed(2)}</span></div>
+        <div class="rc-f-row"><span class="rc-f-lbl">Mão de obra / un</span><span class="rc-f-val">R$ ${laborUn.toFixed(2)}</span></div>
+        <div class="rc-f-row"><span class="rc-f-lbl">Custo real / un</span><span class="rc-f-val">R$ ${custoUn.toFixed(2)}</span></div>
         <div class="rc-profit-row">
-          <span class="rc-profit-lbl">Lucro por unidade</span>
-          <span class="rc-profit-val">R$ ${(p.preco - perUnit).toFixed(2)} (${margem.toFixed(0)}%)</span>
+          <span class="rc-profit-lbl">Margem de contribuição / un</span>
+          <span class="rc-profit-val" style="${cmUn<=0?'color:#E24B4A;':''}">R$ ${cmUn.toFixed(2)} (${cmPct.toFixed(0)}%)</span>
         </div>
+        <div class="rc-f-row" style="margin-top:6px;"><span class="rc-f-lbl">Preço sugerido (30% margem)</span><span class="rc-f-val">R$ ${sugerido.toFixed(2)}</span></div>
         <div class="rc-margin-wrap">
-          <div class="rc-margin-top"><span>Margem de lucro</span><span>${margem.toFixed(0)}%</span></div>
-          <div class="rc-margin-bar"><div class="rc-margin-fill" style="width:${Math.min(100,margem).toFixed(0)}%;background:${margem>60?'var(--teal-dark)':'var(--gold)'};"></div></div>
+          <div class="rc-margin-top"><span>Margem de contribuição</span><span>${cmPct.toFixed(0)}%</span></div>
+          <div class="rc-margin-bar"><div class="rc-margin-fill" style="width:${Math.max(0,Math.min(100,cmPct)).toFixed(0)}%;background:${cmUn>0?'var(--gold)':'#E24B4A'};"></div></div>
         </div>
       </div>
     </div>`;
@@ -7346,11 +7412,230 @@ function getBusinessContext() {
   orders.forEach(o=>(o.itens||[]).forEach(i=>{prodCount[i.nome]=(prodCount[i.nome]||0)+i.qty;}));
   const top = Object.entries(prodCount).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,q])=>`${n}(${q})`).join(", ");
   const lowIng = allIngredients.filter(i=>Number(i.estoque||0)<Number(i.min||0)).map(i=>i.nome).join(", ");
-  return `Período: ${periodMode} | Faturamento: R$${fat.toFixed(2)} | Lucro estimado: R$${lucro.toFixed(2)} | Pedidos: ${orders.length} | Top produtos: ${top||"—"} | Ingredientes baixos: ${lowIng||"nenhum"} | Total clientes: ${allOrders.length}`;
+  let plano = "";
+  try {
+    const pl = computePlano();
+    const margens = pl.ranked.slice(0,8).map(i=>`${i.nome}: MC/un R$${i.cmUn.toFixed(2)}, MC/receita R$${i.cmRec.toFixed(2)}`).join(" ; ");
+    const prejuizo = pl.loss.map(i=>i.nome).join(", ");
+    plano = ` || PLANO DO MÊS (metodologia de margem de contribuição): pró-labore meta R$${pl.c.proLabore.toFixed(0)}, reserva R$${pl.c.reserva.toFixed(0)}, custo fixo total a cobrir R$${pl.custoFixoTotal.toFixed(2)}, valor da hora R$${pl.valorHora.toFixed(2)}. Para bater a meta: ~${pl.unidades} unidades/mês (~${pl.receitasTotal} receitas), meta semanal ~${pl.semanaUnid} unidades, uso de capacidade ${pl.usoCapacidade.toFixed(0)}%. Margem por produto (do melhor para o pior — ranqueie por MC/receita, pois o gargalo é o tempo de produção): ${margens}.${prejuizo ? " PRODUTOS NO PREJUÍZO (margem de contribuição negativa, não vale a pena vender pelo preço atual): " + prejuizo + "." : ""}`;
+  } catch(e) {}
+  return `Período: ${periodMode} | Faturamento: R$${fat.toFixed(2)} | Lucro estimado: R$${lucro.toFixed(2)} | Pedidos: ${orders.length} | Top produtos: ${top||"—"} | Ingredientes baixos: ${lowIng||"nenhum"} | Total clientes: ${allOrders.length}${plano}`;
 }
 
-let iaHistory = [];
-const IA_SYSTEM = `Você é consultora especializada em confeitaria artesanal e negócios. Responda em português, de forma prática e direta.`;
+// ─── ENGINE DE PRECIFICAÇÃO & PLANEJAMENTO (fonte única de verdade) ──────────
+function _plPricePerG(ing){ return ing.unit === "kg" ? (Number(ing.preco)||0)/1000 : (Number(ing.preco)||0); }
+
+function _planCfg(){
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("panillo-config")||"{}"); } catch(e){}
+  const g = (id, def) => { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? def : v; };
+  return {
+    proLabore:  g("pl-prolabore",  Number(saved.proLabore)||2500),
+    reserva:    g("pl-reserva",    Number(saved.reserva)||0),
+    contas:     g("pl-contas",     Number(saved.contasFixas)||200),
+    cartao:     g("pl-cartao",     Number(saved.taxaCartao)||3.09)/100,
+    horas:      g("pl-horas",      Number(saved.horasMes)||160),
+    tempo:      g("pl-tempo",      Number(saved.tempoReceita)||55),
+    perda:      g("pl-perda",      Number(saved.perda)||5)/100,
+    capacidade: g("pl-capacidade", Number(saved.capacidadeReceitas)||80),
+  };
+}
+
+function computePlano(){
+  const c = _planCfg();
+  const valorHora = c.horas > 0 ? c.proLabore / c.horas : 0;
+  const prods = (allProducts||[]).filter(p => p.ingredientes && p.ingredientes.length > 0 && p.categoria !== "combo" && p.ativo !== false);
+  const items = prods.map(p => {
+    const rend = Number(p.rendimento) || 1;
+    let ingReceita = 0;
+    (p.ingredientes||[]).forEach(pi => {
+      const ing = allIngredients.find(i => i.id === pi.ingId);
+      if (ing) ingReceita += _plPricePerG(ing) * (Number(pi.grams)||0);
+    });
+    const ingUn   = (ingReceita/rend) * (1 + c.perda);
+    const laborUn = (c.tempo/rend) * valorHora / 60;
+    const preco   = Number(p.preco) || 0;
+    const cmUn    = preco*(1 - c.cartao) - ingUn - laborUn;
+    return { id:p.id, nome:p.nome, emoji:p.emoji||"🍪", rend, preco, ingUn, laborUn, custoUn:ingUn+laborUn, cmUn, cmRec:cmUn*rend };
+  });
+  const sellable = items.filter(i => i.cmUn > 0);
+  const loss     = items.filter(i => i.cmUn <= 0);
+  const custoFixoTotal = c.contas + c.proLabore + c.reserva;
+  const avgCm = sellable.length ? sellable.reduce((s,i)=>s+i.cmUn,0)/sellable.length : 0;
+  const unidades = avgCm > 0 ? Math.ceil(custoFixoTotal/avgCm) : 0;
+  const nProd = sellable.length || 1;
+  const unitsPerProd = unidades/nProd;
+  let receitasTotal = 0;
+  const dist = sellable.map(i => {
+    const receitas = Math.max(1, Math.ceil(unitsPerProd / i.rend));
+    receitasTotal += receitas;
+    return { ...i, receitas, unidadesReais: receitas*i.rend };
+  });
+  const semanaUnid = Math.ceil(unidades/4.33);
+  const semanaRec  = Math.ceil(receitasTotal/4.33);
+  const usoCapacidade = c.capacidade > 0 ? receitasTotal/c.capacidade*100 : 0;
+  const faturamento = dist.reduce((s,d)=>s+d.unidadesReais*d.preco,0);
+  const compraMap = {};
+  dist.forEach(d => {
+    const p = allProducts.find(x => x.id === d.id);
+    (p.ingredientes||[]).forEach(pi => { compraMap[pi.ingId] = (compraMap[pi.ingId]||0) + (Number(pi.grams)||0)*d.receitas; });
+  });
+  const compras = Object.entries(compraMap).map(([ingId, grams]) => {
+    const ing = allIngredients.find(i => i.id === ingId) || { nome:ingId, estoque:0, unit:"g", preco:0 };
+    const estoque = Number(ing.estoque)||0;
+    const comprar = Math.max(0, grams - estoque);
+    return { nome:ing.nome, unit:ing.unit||"g", precisa:grams, estoque, comprar, custo:comprar*_plPricePerG(ing) };
+  }).sort((a,b)=>b.custo-a.custo);
+  const custoCompras = compras.reduce((s,x)=>s+x.custo,0);
+  const ranked = [...sellable].sort((a,b)=>b.cmRec-a.cmRec);
+  return { c, valorHora, items, sellable, loss, ranked, dist, custoFixoTotal, avgCm, unidades, receitasTotal, semanaUnid, semanaRec, usoCapacidade, faturamento, compras, custoCompras };
+}
+
+function loadPlanejamento(){
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("panillo-config")||"{}"); } catch(e){}
+  const set = (id,v) => { const el = document.getElementById(id); if (el && v != null && v !== "") el.value = v; };
+  set("pl-prolabore", saved.proLabore);
+  set("pl-reserva", saved.reserva);
+  set("pl-contas", saved.contasFixas);
+  set("pl-cartao", saved.taxaCartao);
+  set("pl-horas", saved.horasMes);
+  set("pl-tempo", saved.tempoReceita);
+  set("pl-perda", saved.perda);
+  set("pl-capacidade", saved.capacidadeReceitas);
+  recalcPlano();
+}
+
+function _brl(v){ return "R$ " + (Number(v)||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function recalcPlano(){
+  const pl = computePlano();
+  const card = (lbl,val,sub) => `<div style="background:rgba(196,123,53,0.10);border-radius:10px;padding:14px 16px;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${lbl}</div>
+      <div style="font-size:24px;font-weight:600;color:var(--text);">${val}</div>
+      ${sub?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">${sub}</div>`:""}</div>`;
+
+  document.getElementById("pl-resumo").innerHTML =
+    `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+      ${card("Cookies a vender no mês", pl.unidades, "para cobrir custo fixo + seu salário")}
+      ${card("Receitas a produzir", pl.receitasTotal, `de ${pl.c.capacidade} possíveis (${Math.round(pl.usoCapacidade)}%)`)}
+      ${card("Meta semanal", pl.semanaUnid + " un.", `≈ ${pl.semanaRec} receitas/semana`)}
+      ${card("Faturamento estimado", _brl(pl.faturamento), "se vender tudo do plano")}
+    </div>`;
+
+  let aviso = "";
+  if (pl.sellable.length === 0){
+    aviso = `<div style="background:rgba(226,75,74,0.12);border-left:3px solid #E24B4A;border-radius:0 8px 8px 0;padding:12px 14px;margin-top:14px;font-size:13px;color:var(--text);">Nenhum produto com margem positiva encontrado. Cadastre produtos com ingredientes (com gramas e preços) na aba Suprimentos para o cálculo funcionar.</div>`;
+  } else {
+    if (pl.usoCapacidade > 100) aviso += `<div style="background:rgba(226,75,74,0.12);border-left:3px solid #E24B4A;border-radius:0 8px 8px 0;padding:12px 14px;margin-top:14px;font-size:13px;color:var(--text);"><strong>Atenção:</strong> esta meta exige ${pl.receitasTotal} receitas, acima da sua capacidade de ${pl.c.capacidade}/mês (${Math.round(pl.usoCapacidade)}%). Reduza o pró-labore/reserva, aumente preços ou foque nos produtos de melhor margem.</div>`;
+    else if (pl.usoCapacidade > 85) aviso += `<div style="background:rgba(186,117,23,0.12);border-left:3px solid #BA7517;border-radius:0 8px 8px 0;padding:12px 14px;margin-top:14px;font-size:13px;color:var(--text);">Margem de segurança apertada: ${Math.round(pl.usoCapacidade)}% da capacidade. Sobra pouco espaço para imprevistos.</div>`;
+    if (pl.loss.length) aviso += `<div style="background:rgba(186,117,23,0.12);border-left:3px solid #BA7517;border-radius:0 8px 8px 0;padding:12px 14px;margin-top:10px;font-size:13px;color:var(--text);"><strong>No prejuízo pelo preço atual:</strong> ${pl.loss.map(i=>i.nome).join(", ")} — cada unidade vendida tira dinheiro do seu bolso. Suba o preço ou tire do cardápio.</div>`;
+  }
+  document.getElementById("pl-aviso").innerHTML = aviso;
+
+  if (pl.sellable.length){
+    const rows = pl.ranked.map((i,idx) => {
+      const d = pl.dist.find(x=>x.id===i.id) || {receitas:0,unidadesReais:0};
+      const best = idx === 0 ? ` <span style="background:rgba(29,158,117,0.15);color:#1D9E75;font-size:10px;padding:2px 7px;border-radius:6px;">melhor margem</span>` : "";
+      return `<tr>
+        <td style="padding:9px 8px;">${i.emoji} ${i.nome}${best}</td>
+        <td style="padding:9px 8px;text-align:right;">${_brl(i.preco)}</td>
+        <td style="padding:9px 8px;text-align:right;">${_brl(i.cmUn)}</td>
+        <td style="padding:9px 8px;text-align:right;font-weight:600;color:var(--gold);">${_brl(i.cmRec)}</td>
+        <td style="padding:9px 8px;text-align:right;">${d.unidadesReais} un. / ${d.receitas} rec.</td>
+      </tr>`;
+    }).join("");
+    document.getElementById("pl-produtos").innerHTML = `<div class="admin-card">
+      <div class="ac-title">Melhores produtos para vender</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Ordenados por <strong>margem de contribuição por receita</strong> — é o que mais rende por sessão de produção, já que seu gargalo é o tempo, não o dinheiro. Vender mais dos primeiros da lista bate a meta com menos trabalho.</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="border-bottom:1px solid var(--border-mid);color:var(--muted);font-size:11px;text-align:left;">
+          <th style="padding:8px;">Produto</th><th style="padding:8px;text-align:right;">Preço</th><th style="padding:8px;text-align:right;">Margem/un</th><th style="padding:8px;text-align:right;">Margem/receita</th><th style="padding:8px;text-align:right;">Plano do mês</th>
+        </tr></thead><tbody>${rows}</tbody></table></div>
+    </div>`;
+
+    document.getElementById("pl-semanal").innerHTML = `<div class="admin-card">
+      <div class="ac-title">Sua meta, semana a semana</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:8px;">
+        ${[1,2,3,4].map(s=>`<div style="background:rgba(196,123,53,0.08);border-radius:9px;padding:12px;text-align:center;">
+          <div style="font-size:12px;color:var(--muted);">Semana ${s}</div>
+          <div style="font-size:20px;font-weight:600;color:var(--text);margin:4px 0;">${pl.semanaUnid} un.</div>
+          <div style="font-size:11px;color:var(--muted);">≈ ${pl.semanaRec} receitas</div>
+        </div>`).join("")}
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:10px;">Bata ~${pl.semanaUnid} cookies por semana e você fecha o mês na meta. Valor da sua hora neste cenário: <strong>${_brl(pl.valorHora)}/h</strong>.</div>
+    </div>`;
+
+    const compraRows = pl.compras.map(x => `<tr>
+      <td style="padding:8px;">${x.nome}</td>
+      <td style="padding:8px;text-align:right;">${Math.round(x.precisa)} ${x.unit==="kg"?"g":x.unit}</td>
+      <td style="padding:8px;text-align:right;color:var(--muted);">${Math.round(x.estoque)} ${x.unit==="kg"?"g":x.unit}</td>
+      <td style="padding:8px;text-align:right;font-weight:600;color:${x.comprar>0?"var(--text)":"#1D9E75"};">${x.comprar>0?Math.round(x.comprar)+" "+(x.unit==="kg"?"g":x.unit):"tem em estoque"}</td>
+      <td style="padding:8px;text-align:right;">${x.comprar>0?_brl(x.custo):"—"}</td>
+    </tr>`).join("");
+    document.getElementById("pl-compras").innerHTML = `<div class="admin-card">
+      <div class="ac-title">Lista de compras para produzir tudo isso</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Calculada a partir das ${pl.receitasTotal} receitas do plano, descontando o que você já tem em estoque.</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="border-bottom:1px solid var(--border-mid);color:var(--muted);font-size:11px;text-align:left;">
+          <th style="padding:8px;">Matéria-prima</th><th style="padding:8px;text-align:right;">Precisa</th><th style="padding:8px;text-align:right;">Em estoque</th><th style="padding:8px;text-align:right;">Comprar</th><th style="padding:8px;text-align:right;">Custo estimado</th>
+        </tr></thead><tbody>${compraRows}</tbody></table></div>
+      <div style="text-align:right;font-size:14px;margin-top:12px;color:var(--text);">Total a investir em ingredientes: <strong style="color:var(--gold);">${_brl(pl.custoCompras)}</strong></div>
+    </div>`;
+  } else {
+    document.getElementById("pl-produtos").innerHTML = "";
+    document.getElementById("pl-semanal").innerHTML = "";
+    document.getElementById("pl-compras").innerHTML = "";
+  }
+}
+
+async function savePlanejamento(){
+  let existing = {};
+  try { existing = JSON.parse(localStorage.getItem("panillo-config")||"{}"); } catch(e){}
+  const v = id => { const el = document.getElementById(id); return el ? el.value : ""; };
+  const cfg = { ...existing,
+    proLabore:v("pl-prolabore"), reserva:v("pl-reserva"), contasFixas:v("pl-contas"),
+    taxaCartao:v("pl-cartao"), horasMes:v("pl-horas"), tempoReceita:v("pl-tempo"),
+    perda:v("pl-perda"), capacidadeReceitas:v("pl-capacidade") };
+  localStorage.setItem("panillo-config", JSON.stringify(cfg));
+  try {
+    const docs = await fbGet("appConfig");
+    if (docs.length > 0) await fbUpdate("appConfig", docs[0].id, { ...cfg, updatedAt: FB.serverTimestamp() });
+    else await fbAdd("appConfig", cfg);
+  } catch(e){ console.warn("Planejamento: Firebase indisponível, salvo localmente.", e); }
+  showToast("Premissas salvas!");
+  recalcPlano();
+}
+
+function exportPlanoCSV(){
+  const pl = computePlano();
+  let csv = "Materia-prima;Precisa;Em estoque;Comprar;Custo estimado (R$)\n";
+  pl.compras.forEach(x => {
+    const u = x.unit === "kg" ? "g" : x.unit;
+    csv += `${x.nome};${Math.round(x.precisa)}${u};${Math.round(x.estoque)}${u};${x.comprar>0?Math.round(x.comprar)+u:"0"};${x.custo.toFixed(2)}\n`;
+  });
+  csv += `TOTAL;;;;${pl.custoCompras.toFixed(2)}\n`;
+  const blob = new Blob(["\ufeff"+csv], { type:"text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "lista_compras_panillo.csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+const IA_SYSTEM = `Você é consultora de confeitaria artesanal e negócios da Panillo (Fortaleza/CE). Responda em português, direta e prática, e MOSTRE a conta quando recomendar preço ou volume.
+
+REGRA DE OURO — nunca precifique só por ingrediente + uma % genérica. Todo preço considera 3 custos reais: (1) custo fixo rateado (contas, existem mesmo vendendo zero); (2) pró-labore (o salário do dono); (3) tempo de produção (cada minuto ativo tem valor).
+
+PREÇO: Custo Total/un = ingrediente/un + mão de obra/un + custo fixo rateado/un. Preço mínimo = Custo Total/un ÷ (1 − taxa cartão − imposto). Preço sugerido = Custo Total/un ÷ (1 − margem − taxa cartão − imposto).
+
+VOLUME (quantos vender): Unidades necessárias = Custo Fixo Total (com pró-labore e reserva) ÷ Margem de Contribuição/un. Margem de Contribuição/un = Preço × (1 − taxa cartão) − ingrediente/un − mão de obra/un. REGRA: o custo fixo entra UMA vez só, no numerador, nunca dentro do custo da unidade.
+
+TEMPO: Valor da hora = pró-labore ÷ horas/mês. Mão de obra/un = (tempo ativo da receita ÷ rendimento) × valor da hora ÷ 60. Só tempo ATIVO conta.
+
+GARGALO: o limite é o TEMPO de produção, não o dinheiro. Ao indicar quais produtos priorizar, ranqueie pela margem de contribuição POR RECEITA, não por unidade.
+
+DADOS AO VIVO: use os números do "Contexto do negócio" e do "PLANO DO MÊS" enviados junto — eles já vêm calculados pela mesma fórmula da aba Planejamento do Mês, então suas respostas devem bater com o que o app mostra lá. NUNCA invente preço, volume, meta ou pró-labore. Se faltar um dado para fechar a conta, peça antes de responder.`;
 
 async function askIA() {
   const input = document.getElementById("ia-input");
@@ -7620,6 +7905,15 @@ async function loadConfig() {
     document.getElementById("cfg-pix").value     = cfg.pix      || "";
     document.getElementById("cfg-periods").value = (cfg.periods || ["Manhã (9h–12h)","Tarde (13h–18h)"]).join("\n");
     document.getElementById("cfg-capacity").value= cfg.capacity || "";
+    const _plset = (id,v)=>{ const el=document.getElementById(id); if(el && v!=null && v!=="") el.value=v; };
+    _plset("pl-prolabore", cfg.proLabore);
+    _plset("pl-reserva", cfg.reserva);
+    _plset("pl-contas", cfg.contasFixas);
+    _plset("pl-cartao", cfg.taxaCartao);
+    _plset("pl-horas", cfg.horasMes);
+    _plset("pl-tempo", cfg.tempoReceita);
+    _plset("pl-perda", cfg.perda);
+    _plset("pl-capacidade", cfg.capacidadeReceitas);
     renderCouponsList();
   }
 
