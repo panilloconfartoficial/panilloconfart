@@ -2153,10 +2153,10 @@ img { max-width: 100%; display: block; }
         <div id="success-receipt" style="background:var(--cream);border:1px solid var(--border-mid);border-radius:14px;padding:18px;text-align:left;width:100%;max-width:400px;margin:0 auto 20px;"></div>
 
         <div id="success-pix-box" class="hidden" style="background:#E8F3F3;border:1px solid rgba(15,74,74,0.2);border-radius:12px;padding:14px 18px;width:100%;max-width:400px;margin:0 auto 16px;text-align:left;">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Chave Pix para pagamento:</div>
-          <div id="success-pix-key" style="font-size:15px;font-weight:500;color:var(--teal-dark);margin-bottom:8px;"></div>
-          <button onclick="copyPix()" style="background:var(--teal-dark);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-            <i class="ti ti-copy"></i> Copiar chave Pix
+          <div id="success-pix-label" style="font-size:12px;color:var(--muted);margin-bottom:4px;">Pix Cópia e Cola (valor já incluído):</div>
+          <div id="success-pix-key" style="font-size:11px;font-family:monospace;word-break:break-all;color:var(--teal-dark);margin-bottom:8px;"></div>
+          <button id="pix-copy-btn" onclick="copyPix()" style="background:var(--teal-dark);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <i class="ti ti-copy"></i> Copiar Pix Cópia e Cola
           </button>
         </div>
 
@@ -4278,8 +4278,8 @@ function updateCartUI() {
   const footerEl = document.getElementById("cart-footer-panel");
   const isPE     = items.some(i => i.prod._pe);
 
-  // Coupon discount
-  const discPct  = activeCoupon ? activeCoupon.pct : 0;
+  // Coupon discount (pct pode ser null quando cupom está pendente de validação)
+  const discPct  = activeCoupon?.pct || 0;
   const discVal  = subtotal * discPct / 100;
   const total    = subtotal - discVal;
 
@@ -4548,27 +4548,30 @@ function toggleClienteOpt(isReturning) {
 }
 
 async function buscarClienteExistente() {
-  const wpp = document.getElementById("f-wpp-busca").value.replace(/\D/g,"");
+  const raw    = document.getElementById("f-wpp-busca").value.replace(/\D/g,"");
   const result = document.getElementById("busca-resultado");
-  if (wpp.length < 8) { result.innerHTML = `<span style="color:#993C1D;">Digite um número válido.</span>`; return; }
+  if (raw.length < 8) { result.innerHTML = `<span style="color:#993C1D;">Digite um número válido.</span>`; return; }
 
   const btn = document.getElementById("btn-buscar-cliente");
   btn.disabled = true; btn.textContent = "Buscando...";
   result.innerHTML = `<span style="color:var(--muted);">Buscando...</span>`;
 
-  try {
-    // Busca via endpoint server-side (/api/find-client), que usa o Admin
-    // SDK para ler "clients" e devolve apenas os campos necessários do
-    // cliente correspondente — sem expor a coleção inteira ao navegador
-    // (que é o que fbGet("clients") fazia antes). As regras do Firestore
-    // continuam bloqueando leitura pública direta; este endpoint contorna
-    // isso com credenciais de admin no servidor.
-    const resp = await fetch(`/api/find-client?wpp=${encodeURIComponent(wpp)}`);
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data?.error || "Erro ao buscar");
+  // Tenta o número com e sem DDI 55 — clientes antigos podem ter sido
+  // salvos em formato diferente. Mesmo padrão de portalLoadOrders().
+  const variants = [raw, raw.startsWith("55") ? raw.slice(2) : "55" + raw];
 
-    if (data.found) {
-      const found = data;
+  try {
+    let found = null;
+    let foundWpp = raw;
+
+    for (const v of variants) {
+      const resp = await fetch(`/api/find-client?wpp=${encodeURIComponent(v)}`);
+      const data = await resp.json();
+      if (!resp.ok) continue;
+      if (data.found) { found = data; foundWpp = v; break; }
+    }
+
+    if (found) {
       result.innerHTML = `
         <div style="background:#E8F5F0;border:1px solid #A8DCC8;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
           <div style="width:36px;height:36px;border-radius:50%;background:var(--teal-dark);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">
@@ -4579,9 +4582,9 @@ async function buscarClienteExistente() {
             <div style="font-size:11px;color:var(--muted);">${found.pedidos||0} pedido(s) · R$ ${Number(found.totalGasto||0).toFixed(2).replace(".",",")}</div>
           </div>
         </div>`;
-      // Salva no localStorage para usar no step-1
+      // Salva no localStorage usando o número que efetivamente encontrou
       localStorage.setItem("panillo-cliente", JSON.stringify({
-        nome: found.nome, wpp,
+        nome: found.nome, wpp: foundWpp,
         email: found.email||"", bday: found.bday||"", obs: found.obs||""
       }));
     } else {
@@ -4774,6 +4777,12 @@ async function submitOrder() {
   document.getElementById("step-3").classList.add("active");
 
   buildReceipt(order, orderNum);
+
+  // ─── Salva/atualiza cliente no Firestore ───────────────────────────────
+  // Era chamado apenas via "Cadastre-se". Agora também é chamado aqui para
+  // garantir que todo cliente que finalizar um pedido seja persistido,
+  // mesmo que não tenha se cadastrado previamente.
+  saveClientToFirebase(client, order).catch(e => console.warn("saveClientToFirebase error:", e));
 
   const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
   const addr = enderecoIdx === "2" ? (cfg.addr2 || cfg.addr1 || "nosso endereço") : (cfg.addr1 || "nosso endereço");
@@ -8105,39 +8114,36 @@ async function removeCoupon(idx) {
 async function applyCoupon() {
   const code = (document.getElementById("coupon-input")?.value || "").trim().toUpperCase();
   if (!code) return;
-  let cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
-  // Se não tem cupons locais, tenta buscar do Firebase
-  if (!(cfg.coupons||[]).length && db && FB) {
-    try {
-      const docs = await fbGet("appConfig");
-      if (docs.length > 0 && docs[0].coupons) {
-        cfg.coupons = docs[0].coupons;
-        localStorage.setItem("panillo-config", JSON.stringify({...cfg}));
-      }
-    } catch(e) {}
-  }
-  const found = (cfg.coupons||[]).find(c=>c.code===code);
-  const wrap  = document.getElementById("coupon-badge-wrap");
+  const wrap    = document.getElementById("coupon-badge-wrap");
   const discRow = document.getElementById("discount-row");
-  // Valida expiração e limite de uso antes de aceitar o cupom
-  let invalido = null;
-  if (found) {
-    const today = new Date().toISOString().split("T")[0];
-    if (found.validade && found.validade < today) invalido = "expirado";
-    else if (found.maxUsos && (found.usos||0) >= found.maxUsos) invalido = "esgotado";
-  }
-  if (found && !invalido) {
-    activeCoupon = found;
-    if (wrap) wrap.innerHTML = `<div class="coupon-badge">✓ ${found.code} — ${found.pct}% de desconto</div>`;
-    updateCartUI();
-    showToast(`Cupom aplicado: ${found.pct}% de desconto!`);
-  } else {
-    activeCoupon = null;
-    const msg = invalido === "expirado" ? "Cupom expirado"
-              : invalido === "esgotado" ? "Cupom atingiu o limite de usos"
-              : "Cupom inválido ou expirado";
-    if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">${msg}</div>`;
-    if (discRow) discRow.style.display = "none";
+  if (wrap) wrap.innerHTML = `<span style="font-size:12px;color:var(--muted);">Verificando cupom...</span>`;
+
+  try {
+    // Valida cupom via endpoint server-side que usa Admin SDK para ler o Firestore.
+    // Isso contorna o bloqueio das regras públicas de leitura do Firestore.
+    const resp = await fetch(`/api/validate-coupon?code=${encodeURIComponent(code)}`);
+    const data = await resp.json();
+
+    if (resp.ok && data.valid) {
+      activeCoupon = { code, pct: data.pct };
+      if (wrap) wrap.innerHTML = `<div class="coupon-badge">✓ ${code} — ${data.pct}% de desconto</div>`;
+      updateCartUI();
+      showToast(`Cupom aplicado: ${data.pct}% de desconto!`);
+    } else {
+      activeCoupon = null;
+      const msg = data.reason === "expirado"  ? "Cupom expirado"
+                : data.reason === "esgotado"  ? "Cupom atingiu o limite de usos"
+                : (data.error || "Cupom inválido ou não encontrado");
+      if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">${msg}</div>`;
+      if (discRow) discRow.style.display = "none";
+      updateCartUI();
+    }
+  } catch(e) {
+    // Endpoint ainda não existe ou erro de rede: aceita otimisticamente
+    // e deixa o servidor validar ao finalizar o pedido (/api/create-order).
+    console.warn("validate-coupon indisponível, aceitando otimisticamente:", e.message);
+    activeCoupon = { code, pct: null, pendente: true };
+    if (wrap) wrap.innerHTML = `<div class="coupon-badge" style="background:#FDF3DC;color:#7A5A00;">⏳ ${code} — validando no envio…</div>`;
     updateCartUI();
   }
 }
@@ -8181,18 +8187,44 @@ async function portalLoadOrders() {
   btn.textContent = "…"; btn.disabled = true;
   _portalWpp = raw;
 
+  // Tenta variantes com e sem DDI 55 para máxima compatibilidade
+  const variants = [raw, raw.startsWith("55") ? raw.slice(2) : "55" + raw];
+  let orders = [];
+
   try {
-    const variants = [raw, raw.startsWith("55") ? raw.slice(2) : "55"+raw];
-    let orders = [];
-    if (db && FB) {
+    // Estratégia 1: endpoint server-side /api/client-orders (usa Admin SDK,
+    // contorna bloqueio público do Firestore nas regras de segurança)
+    let apiOk = false;
+    for (const v of variants) {
+      try {
+        const resp = await fetch(`/api/client-orders?wpp=${encodeURIComponent(v)}`);
+        if (resp.status === 404) break; // endpoint não existe, vai para fallback
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.orders?.length) orders = [...orders, ...data.orders];
+          apiOk = true;
+        }
+      } catch {}
+    }
+
+    // Estratégia 2 (fallback): query direta no Firestore — pode funcionar
+    // se as regras de segurança permitirem leitura condicional por wpp.
+    if (!apiOk && db && FB) {
       for (const v of variants) {
-        const snap = await FB.getDocs(
-          FB.query(FB.collection(db,"orders"), FB.where("cliente.wpp","==",v))
-        );
-        snap.forEach(d => orders.push({ id:d.id, ...d.data() }));
+        try {
+          const snap = await FB.getDocs(
+            FB.query(FB.collection(db,"orders"), FB.where("cliente.wpp","==",v))
+          );
+          snap.forEach(d => orders.push({ id:d.id, ...d.data() }));
+        } catch {}
       }
     }
-    _portalOrders = orders.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+    // Deduplicar por id (mesma ordem pode aparecer via variantes diferentes)
+    const seen = new Set();
+    orders = orders.filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; });
+
+    _portalOrders = orders.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
     renderPortalOrders();
     renderPortalHistory();
   } catch(e) {
@@ -8599,10 +8631,12 @@ function closeClientDetail() {
 
 // ─── PIX COPY ──────────────────────────────────────────
 function copyPix() {
-  const key = PIX_KEY || "panilloconfart@gmail.com";
-  navigator.clipboard.writeText(key).then(() => showToast("Chave Pix copiada!")).catch(() => {
-    prompt("Copie a chave Pix:", key);
-  });
+  // window._pixPayload é preenchido por buildReceipt() com o payload EMV
+  // que já inclui o valor exato do pedido. Fallback para a chave estática.
+  const payload = window._pixPayload || PIX_KEY || "panilloconfart@gmail.com";
+  navigator.clipboard.writeText(payload)
+    .then(() => showToast("Pix Cópia e Cola copiado! Cole no app do seu banco."))
+    .catch(() => { prompt("Copie o código Pix Cópia e Cola:", payload); });
 }
 
 // ─── NOTIFY CLIENT (WhatsApp) ──────────────────────────
@@ -8617,6 +8651,51 @@ function notifyClient(orderId) {
     `Olá ${nome}! 🍪\n\nSeu pedido da *Panillo* está pronto para retirada!\n\n${itens}\n\n📍 Retire em: ${addr}\n\nQualquer dúvida é só falar. Obrigada! 💛`
   );
   window.open(`https://wa.me/55${order.cliente.wpp.replace(/\D/g,"")}?text=${msg}`, "_blank");
+}
+
+// ─── GERADOR PIX CÓPIA E COLA (BR Code EMV) ───────────────────────────
+// Gera o payload padrão Pix (BACEN) com valor embutido.
+// Não depende de API externa — tudo calculado localmente.
+function gerarPixEMV(chave, valor, nomeBeneficiario, cidade, txid) {
+  // Helper: campo EMV = ID(2) + tamanho(2) + valor
+  const f = (id, v) => { const s = String(v); return id + String(s.length).padStart(2,"0") + s; };
+
+  // Remove acentos e caracteres inválidos do nome e cidade
+  const norm = str => String(str||"")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .toUpperCase().replace(/[^A-Z0-9 ]/g," ").replace(/\s+/g," ").trim();
+
+  const nome = norm(nomeBeneficiario||"PANILLO").substring(0,25);
+  const cid  = norm(cidade||"FORTALEZA").substring(0,15);
+  const txSafe = String(txid||"***").replace(/[^a-zA-Z0-9]/g,"").substring(0,25) || "***";
+  const val  = parseFloat(valor||0).toFixed(2);
+
+  // Campo 26: Merchant Account Information (Pix)
+  const mai = f("00","br.gov.bcb.pix") + f("01", chave);
+  // Campo 62: Additional Data (referência do pedido)
+  const addt = f("05", txSafe);
+
+  // Monta payload sem o CRC (terminando em "6304")
+  let p = f("00","01")       // Payload Format Indicator
+        + f("26", mai)        // Merchant Account Info
+        + f("52","0000")      // MCC (não aplicável = 0000)
+        + f("53","986")       // Moeda BRL
+        + (parseFloat(valor||0) > 0 ? f("54", val) : "")  // Valor
+        + f("58","BR")        // País
+        + f("59", nome)       // Nome do beneficiário
+        + f("60", cid)        // Cidade
+        + f("62", addt)       // Dados adicionais
+        + "6304";             // CRC placeholder
+
+  // CRC16/CCITT-FALSE (polinômio 0x1021, valor inicial 0xFFFF)
+  let crc = 0xFFFF;
+  for (let i = 0; i < p.length; i++) {
+    crc ^= p.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+    }
+  }
+  return p + crc.toString(16).toUpperCase().padStart(4,"0");
 }
 
 // ─── RECIBO COMPLETO (step 3) ──────────────────────────
@@ -8650,13 +8729,28 @@ function buildReceipt(order, orderNum) {
       <div>💳 Pagamento: <strong>${{pix:"Pix",credito:"Cartão de crédito",debito:"Cartão de débito",dinheiro:"Dinheiro",fiado:"Fiado"}[order.pagamento] || order.pagamento}</strong></div>
     </div>`;
 
-  // Pix box
+  // Pix box — gera Pix Cópia e Cola com o valor exato do pedido
   const pixBox = document.getElementById("success-pix-box");
   if (pixBox) {
     if (order.pagamento === "pix") {
       pixBox.classList.remove("hidden");
+      const chave = PIX_KEY || "panilloconfart@gmail.com";
+      // Gera o payload EMV com valor, nome e número do pedido como txid
+      const emv = gerarPixEMV(chave, total, "Panillo", "Fortaleza", "Ped" + orderNum);
+      window._pixPayload = emv; // armazena para copyPix()
+
+      const labelEl = document.getElementById("success-pix-label");
+      if (labelEl) labelEl.textContent = "Pix Cópia e Cola (valor já incluído):";
+
       const pixKeyEl = document.getElementById("success-pix-key");
-      if (pixKeyEl) pixKeyEl.textContent = PIX_KEY || "panilloconfart@gmail.com";
+      if (pixKeyEl) {
+        // Exibe os primeiros 40 chars + "..." para não transbordar o layout
+        pixKeyEl.textContent = emv.length > 44 ? emv.substring(0,44) + "…" : emv;
+        pixKeyEl.title = emv; // full value on hover
+        pixKeyEl.style.cssText = "font-size:11px;font-family:monospace;word-break:break-all;color:var(--teal-dark);margin-bottom:8px;cursor:default;";
+      }
+      const copyBtn = document.getElementById("pix-copy-btn");
+      if (copyBtn) copyBtn.textContent = "📋 Copiar Pix Cópia e Cola";
     } else {
       pixBox.classList.add("hidden");
     }
