@@ -3936,7 +3936,6 @@ window.addEventListener("firebase-ready", () => {
   // Preenche configurações vindas do servidor
   WPP_NUMBER = window._wppNumber || "";
   PIX_KEY    = window._pixKey    || "";
-  if (WPP_NUMBER) applyFooterWpp(WPP_NUMBER);
 
   // Observa estado de autenticação — redireciona automaticamente se já logada
   FB.onAuthStateChanged(auth, (user) => {
@@ -3957,9 +3956,10 @@ window.addEventListener("firebase-ready", () => {
   });
 
   // Inicia listeners em tempo real — substituem todos os loadXxx() individuais.
-  // onSnapshot dispara imediatamente com os dados atuais e a cada mudança,
-  // eliminando a necessidade de refresh manual para ver atualizações.
   setupRealtimeListeners();
+
+  // Aplica WhatsApp no footer (após setup crítico, com try-catch de segurança)
+  try { if (WPP_NUMBER) applyFooterWpp(WPP_NUMBER); } catch {}
 
   // Reconcilia estoque após os listeners terem carregado os dados iniciais
   setTimeout(() => {
@@ -4052,7 +4052,7 @@ function setupRealtimeListeners() {
     const merged = { ...cfg, ...remote };
     localStorage.setItem("panillo-config", JSON.stringify(merged));
     if (remote.pixKey)    { PIX_KEY    = remote.pixKey;    window._pixKey    = remote.pixKey;    }
-    if (remote.wppNumber) { WPP_NUMBER = remote.wppNumber; window._wppNumber = remote.wppNumber; applyFooterWpp(remote.wppNumber); }
+    if (remote.wppNumber) { WPP_NUMBER = remote.wppNumber; window._wppNumber = remote.wppNumber; try { applyFooterWpp(remote.wppNumber); } catch {} }
     // Aplica logo remota assim que disponível — substitui a logo hardcoded do código
     if (remote.logo) applyLogo(remote.logo);
     if (isAdminVisible()) renderCouponsList();
@@ -9189,7 +9189,7 @@ document.addEventListener("DOMContentLoaded", () => {
       loadDashboard();
       showMobBottomNav(true);
     } else {
-      // Aguarda onAuthStateChanged resolver antes de decidir
+      // Tenta onAuthStateChanged se Firebase já carregou
       const unsubRoute = window._fbModules?.onAuthStateChanged
         ? window._fbModules.onAuthStateChanged(window._auth, (user) => {
             unsubRoute && unsubRoute();
@@ -9202,6 +9202,14 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           })
         : showPage("page-login");
+
+      // Fallback: se firebase-ready demorar, garante que login aparece após 1.5s
+      setTimeout(() => {
+        const storeStillActive = document.getElementById("page-store")?.classList.contains("active");
+        if (storeStillActive && (path === "/admin" || path === "/admin/")) {
+          showPage("page-login");
+        }
+      }, 1500);
     }
   }
 });
