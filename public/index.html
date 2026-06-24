@@ -12,7 +12,7 @@
 <!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { initializeFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, increment }
+  import { initializeFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, increment, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -60,7 +60,7 @@
   window._pixKey    = cfg.pixKey;
   window._fbModules = {
     collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc,
-    query, where, orderBy, serverTimestamp, increment,
+    query, where, orderBy, serverTimestamp, increment, onSnapshot,
     signInWithEmailAndPassword, signOut, onAuthStateChanged
   };
 
@@ -3932,30 +3932,18 @@ window.addEventListener("firebase-ready", () => {
     }
   });
 
-  loadProducts();
-  loadIngredients();
-  loadOrders(); // loadDashboard será chamado dentro de loadOrders após buscar dados
-  loadStock();
-  loadFiadoAccounts();
-  loadDepoimentos();
-  // Após carregar pedidos e estoque, reconcilia qualquer desconto pendente
-  Promise.all([
-    new Promise(r => setTimeout(r, 1200)) // aguarda loadOrders e loadStock acima
-  ]).then(() => {
-    // Só reconcilia se realmente existem pedidos sem desconto — evita leituras desnecessárias
+  // Inicia listeners em tempo real — substituem todos os loadXxx() individuais.
+  // onSnapshot dispara imediatamente com os dados atuais e a cada mudança,
+  // eliminando a necessidade de refresh manual para ver atualizações.
+  setupRealtimeListeners();
+
+  // Reconcilia estoque após os listeners terem carregado os dados iniciais
+  setTimeout(() => {
     const needsReconcile = (allOrders||[]).some(o =>
       o.tipo === "pronta-entrega" && o.status === "entregue" && !o._stockDecremented
     );
     if (needsReconcile) reconcileStock();
-    // Load clients for birthday alerts (background)
-    setTimeout(async () => {
-      try {
-        const clients = await fbGet("clients");
-        allClients = clients;
-        renderBdayAlerts(clients);
-      } catch {}
-    }, 800);
-  });
+  }, 2500);
 });
 
 // Converte preço/unidade do ingrediente para preço/grama (ou preço/ml, tratado como equivalente)
@@ -3970,7 +3958,118 @@ function escHtml(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
-async function fbAdd(col, data) {
+// ─── REAL-TIME LISTENERS (onSnapshot) ─────────────────────────────────
+// Mantém todas as coleções sincronizadas em tempo real entre dispositivos
+// e abas — qualquer mudança no Firestore reflete instantaneamente na tela
+// sem precisar recarregar a página.
+
+let _listeners = {}; // mapa: nome → função unsubscribe
+
+function _stopListen(name) {
+  if (_listeners[name]) { try { _listeners[name](); } catch {} delete _listeners[name]; }
+}
+
+function isAdminVisible() {
+  return document.getElementById("page-admin")?.classList.contains("active");
+}
+
+function setupRealtimeListeners() {
+  if (!db || !FB?.onSnapshot) return;
+
+  // ── Produtos (loja + admin) ───────────────────────────────────────────
+  _stopListen("products");
+  _listeners.products = FB.onSnapshot(FB.collection(db, "products"), snap => {
+    allProducts = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    renderStoreProducts("todos");
+    renderPEProducts();
+    if (isAdminVisible()) renderAdminProducts();
+  }, e => console.warn("RT products:", e.message));
+
+  // ── Estoque PE (loja + admin) ─────────────────────────────────────────
+  _stopListen("stock");
+  _listeners.stock = FB.onSnapshot(FB.collection(db, "stock"), snap => {
+    allStock = {};
+    snap.docs.forEach(d => {
+      const dat = d.data();
+      allStock[dat.prodId] = { id: d.id, qty: dat.qty || 0, ativo: dat.ativo || false };
+    });
+    renderPEProducts();
+  }, e => console.warn("RT stock:", e.message));
+
+  // ── Depoimentos (público + admin) ─────────────────────────────────────
+  _stopListen("depoimentos");
+  _listeners.depoimentos = FB.onSnapshot(FB.collection(db, "depoimentos"), snap => {
+    _allDepoimentos = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    const badge = document.getElementById("badge-depoimentos");
+    if (badge) { badge.textContent = _allDepoimentos.length; badge.style.display = _allDepoimentos.length ? "" : "none"; }
+    // Renderiza grid público
+    const grid = document.getElementById("depoimentos-grid");
+    if (grid) {
+      const visiveis = _allDepoimentos.filter(d => !d.oculto);
+      if (!visiveis.length) {
+        grid.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px;grid-column:1/-1;">Seja o primeiro a avaliar! 🍪</div>';
+      } else {
+        grid.innerHTML = visiveis.map(d => {
+          const estrelas = "★".repeat(d.estrelas||5) + "☆".repeat(5-(d.estrelas||5));
+          const resposta = d.resposta ? `<div class="dep-reply"><div class="dep-reply-lbl">Resposta da Panillo</div><div class="dep-reply-txt">${escHtml(d.resposta)}</div></div>` : "";
+          return `<div class="dep-card"><div class="dep-stars">${estrelas}</div><div class="dep-text">"${escHtml(d.texto)}"</div><div class="dep-name">${escHtml(d.clienteNome || "Cliente")}</div>${resposta}</div>`;
+        }).join("");
+      }
+    }
+    if (isAdminVisible()) renderDepoimentosAdmin();
+  }, e => console.warn("RT depoimentos:", e.message));
+
+  // ── AppConfig (endereço, pix, cupons) ─────────────────────────────────
+  _stopListen("config");
+  _listeners.config = FB.onSnapshot(FB.collection(db, "appConfig"), snap => {
+    if (!snap.docs.length) return;
+    const remote = snap.docs[0].data();
+    const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+    const merged = { ...cfg, ...remote };
+    localStorage.setItem("panillo-config", JSON.stringify(merged));
+    if (remote.pixKey)    { PIX_KEY    = remote.pixKey;    window._pixKey    = remote.pixKey;    }
+    if (remote.wppNumber) { WPP_NUMBER = remote.wppNumber; window._wppNumber = remote.wppNumber; }
+    if (isAdminVisible()) renderCouponsList();
+  }, e => console.warn("RT config:", e.message));
+
+  // ── Pedidos (admin — pode falhar com permission-denied para público) ───
+  _stopListen("orders");
+  _listeners.orders = FB.onSnapshot(FB.collection(db, "orders"), snap => {
+    allOrders = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    const badge = allOrders.filter(o => o.status === "pendente").length;
+    const badgeEl = document.getElementById("badge-pedidos");
+    if (badgeEl) { badgeEl.textContent = badge; updateMbnBadge(badge); }
+    loadDashboard();
+    if (isAdminVisible()) renderOrders();
+  }, e => console.warn("RT orders:", e.message));
+
+  // ── Contas fiado (admin) ──────────────────────────────────────────────
+  _stopListen("fiado");
+  _listeners.fiado = FB.onSnapshot(FB.collection(db, "fiadoAccounts"), snap => {
+    allFiadoAccounts = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    const activeCount = allFiadoAccounts.filter(a => a.autorizado).length;
+    const badgeEl = document.getElementById("badge-fiado");
+    if (badgeEl) badgeEl.textContent = activeCount;
+    if (isAdminVisible()) renderFiadoAdmin();
+  }, e => console.warn("RT fiado:", e.message));
+
+  // ── Ingredientes (admin) ──────────────────────────────────────────────
+  _stopListen("ingredients");
+  _listeners.ingredients = FB.onSnapshot(FB.collection(db, "ingredients"), snap => {
+    allIngredients = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    if (isAdminVisible()) renderIngredients();
+  }, e => console.warn("RT ingredients:", e.message));
+
+  // ── Clientes (admin — background) ─────────────────────────────────────
+  _stopListen("clients");
+  _listeners.clients = FB.onSnapshot(FB.collection(db, "clients"), snap => {
+    allClients = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    renderBdayAlerts(allClients);
+    if (isAdminVisible()) renderClients();
+  }, e => console.warn("RT clients:", e.message));
+}
+
+// ─── FIREBASE HELPERS ──────────────────────────────────────────────────
   return FB.addDoc(FB.collection(db, col), { ...data, createdAt: FB.serverTimestamp() });
 }
 async function fbUpdate(col, id, data) {
@@ -4449,11 +4548,12 @@ function updateNavClientButton(nome) {
 }
 
 async function checkFiadoForClient(wpp) {
-  try {
-    if (!db || !FB) return;
-    // Recarrega contas fiado para atualizar opção de pagamento no checkout
-    await loadFiadoAccounts();
-  } catch {}
+  // allFiadoAccounts é mantido pelo listener em tempo real — não precisa
+  // de fetch manual a cada cadastro. Se ainda vazio (Firebase não iniciou),
+  // faz fetch único como fallback.
+  if (!allFiadoAccounts.length && db && FB) {
+    try { allFiadoAccounts = await fbGet("fiadoAccounts"); } catch {}
+  }
 }
 
 // Ao carregar a página, restaura o nome no botão se já cadastrado
@@ -4556,47 +4656,62 @@ async function buscarClienteExistente() {
   btn.disabled = true; btn.textContent = "Buscando...";
   result.innerHTML = `<span style="color:var(--muted);">Buscando...</span>`;
 
-  // Tenta o número com e sem DDI 55 — clientes antigos podem ter sido
-  // salvos em formato diferente. Mesmo padrão de portalLoadOrders().
+  // Tenta o número com e sem DDI 55 — maior compatibilidade entre formatos salvos
   const variants = [raw, raw.startsWith("55") ? raw.slice(2) : "55" + raw];
 
-  try {
-    let found = null;
-    let foundWpp = raw;
+  let found = null;
+  let foundWpp = raw;
 
-    for (const v of variants) {
+  // ── Estratégia 1: endpoint server-side /api/find-client ───────────────
+  let apiAvailable = true;
+  for (const v of variants) {
+    try {
       const resp = await fetch(`/api/find-client?wpp=${encodeURIComponent(v)}`);
-      const data = await resp.json();
+      if (resp.status === 404) { apiAvailable = false; break; } // endpoint não existe
       if (!resp.ok) continue;
+      const data = await resp.json();
       if (data.found) { found = data; foundWpp = v; break; }
-    }
-
-    if (found) {
-      result.innerHTML = `
-        <div style="background:#E8F5F0;border:1px solid #A8DCC8;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
-          <div style="width:36px;height:36px;border-radius:50%;background:var(--teal-dark);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">
-            ${(found.nome||"?").substring(0,2).toUpperCase()}
-          </div>
-          <div>
-            <div style="font-size:13px;font-weight:600;color:var(--teal-dark);">✅ ${found.nome}</div>
-            <div style="font-size:11px;color:var(--muted);">${found.pedidos||0} pedido(s) · R$ ${Number(found.totalGasto||0).toFixed(2).replace(".",",")}</div>
-          </div>
-        </div>`;
-      // Salva no localStorage usando o número que efetivamente encontrou
-      localStorage.setItem("panillo-cliente", JSON.stringify({
-        nome: found.nome, wpp: foundWpp,
-        email: found.email||"", bday: found.bday||"", obs: found.obs||""
-      }));
-    } else {
-      result.innerHTML = `
-        <div style="background:#FDF6E8;border:1px solid #E8C96A;border-radius:10px;padding:10px 14px;font-size:12px;color:#7A5A00;">
-          ⚠️ Número não encontrado. Verifique ou selecione "primeiro pedido" abaixo.
-        </div>`;
-    }
-  } catch(e) {
-    console.warn("buscarClienteExistente:", e);
-    result.innerHTML = `<span style="color:#993C1D;">Erro ao buscar. Tente novamente.</span>`;
+    } catch { apiAvailable = false; break; }
   }
+
+  // ── Estratégia 2: getDoc direto no Firestore (ID = wpp normalizado) ───
+  // Usado quando o endpoint server-side não existe ou retorna 404.
+  if (!found && !apiAvailable && db && FB) {
+    for (const v of variants) {
+      try {
+        const snap = await FB.getDoc(FB.doc(db, "clients", v));
+        if (snap.exists()) {
+          const d = snap.data();
+          found = { found: true, nome: d.nome, pedidos: d.pedidos, totalGasto: d.totalGasto, email: d.email||"", bday: d.bday||"", obs: d.obs||"" };
+          foundWpp = v;
+          break;
+        }
+      } catch {} // permission-denied ou não encontrado — tenta variante
+    }
+  }
+
+  if (found) {
+    result.innerHTML = `
+      <div style="background:#E8F5F0;border:1px solid #A8DCC8;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--teal-dark);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">
+          ${(found.nome||"?").substring(0,2).toUpperCase()}
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--teal-dark);">✅ ${found.nome}</div>
+          <div style="font-size:11px;color:var(--muted);">${found.pedidos||0} pedido(s) · R$ ${Number(found.totalGasto||0).toFixed(2).replace(".",",")}</div>
+        </div>
+      </div>`;
+    localStorage.setItem("panillo-cliente", JSON.stringify({
+      nome: found.nome, wpp: foundWpp,
+      email: found.email||"", bday: found.bday||"", obs: found.obs||""
+    }));
+  } else {
+    result.innerHTML = `
+      <div style="background:#FDF6E8;border:1px solid #E8C96A;border-radius:10px;padding:10px 14px;font-size:12px;color:#7A5A00;">
+        ⚠️ Número não encontrado. Verifique ou selecione "primeiro pedido" abaixo.
+      </div>`;
+  }
+
   btn.disabled = false; btn.textContent = "Buscar";
 }
 
@@ -5726,7 +5841,11 @@ async function loadFiadoAccounts() {
 }
 
 async function renderFiadoAdmin() {
-  await loadFiadoAccounts();
+  // allFiadoAccounts é mantido atualizado pelo listener em tempo real.
+  // Só faz fetch manual se por algum motivo ainda estiver vazio (fallback).
+  if (!allFiadoAccounts.length) {
+    try { allFiadoAccounts = await fbGet("fiadoAccounts"); } catch {}
+  }
   const list = document.getElementById("fiado-client-list");
   if (!list) return;
 
@@ -8024,11 +8143,34 @@ async function saveConfig() {
 // ─── COUPONS ───────────────────────────────────────────
 let activeCoupon = null;
 
-function renderCouponsList() {
-  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
-  const coupons = cfg.coupons || [];
+// Renderiza a lista de cupons buscando sempre do Firestore (fonte de verdade).
+// Atualiza também o localStorage local para manter sincronia.
+async function renderCouponsList() {
   const el = document.getElementById("coupons-list");
   if (!el) return;
+  el.innerHTML = `<div style="color:var(--muted);font-size:12px;margin-bottom:8px;">Carregando cupons…</div>`;
+
+  let coupons = [];
+  try {
+    if (db && FB) {
+      const docs = await fbGet("appConfig");
+      if (docs.length > 0) {
+        coupons = docs[0].coupons || [];
+        // Mantém localStorage em sincronia com o Firestore
+        const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+        cfg.coupons = coupons;
+        localStorage.setItem("panillo-config", JSON.stringify(cfg));
+      } else {
+        // Firestore sem documento ainda — usa localStorage como fallback
+        coupons = JSON.parse(localStorage.getItem("panillo-config") || "{}").coupons || [];
+      }
+    } else {
+      coupons = JSON.parse(localStorage.getItem("panillo-config") || "{}").coupons || [];
+    }
+  } catch(e) {
+    coupons = JSON.parse(localStorage.getItem("panillo-config") || "{}").coupons || [];
+  }
+
   if (coupons.length === 0) {
     el.innerHTML = `<div style="color:var(--muted);font-size:12px;margin-bottom:8px;">Nenhum cupom cadastrado</div>`;
     return;
@@ -8060,16 +8202,43 @@ async function addCoupon() {
   const maxUsos = maxUsosRaw ? parseInt(maxUsosRaw) : null;
   if (!code || !pct || pct < 1 || pct > 100) { showToast("Preencha código e % válidos!"); return; }
   if (maxUsosRaw && (!maxUsos || maxUsos < 1)) { showToast("Limite de usos inválido!"); return; }
-  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
-  cfg.coupons = cfg.coupons || [];
-  if (cfg.coupons.find(c=>c.code===code)) { showToast("Cupom já existe!"); return; }
-  cfg.coupons.push({ code, pct, validade: validade || null, maxUsos: maxUsos || null, usos: 0 });
-  localStorage.setItem("panillo-config", JSON.stringify(cfg));
+
+  // CRÍTICO: busca a lista ATUAL do Firestore antes de adicionar.
+  // Sem isso, dispositivos diferentes sobrescrevem a lista um do outro
+  // porque cada um só conhece o próprio localStorage.
+  let coupons = [];
+  let firestoreDocId = null;
   try {
-    const docs = await fbGet("appConfig");
-    if (docs.length > 0) await fbUpdate("appConfig", docs[0].id, { coupons: cfg.coupons });
-    else await fbAdd("appConfig", { coupons: cfg.coupons });
-  } catch(e) { console.warn("Cupom: Firebase indisponível.", e); }
+    if (db && FB) {
+      const docs = await fbGet("appConfig");
+      if (docs.length > 0) {
+        coupons = docs[0].coupons || [];
+        firestoreDocId = docs[0].id;
+      }
+    } else {
+      // Sem Firebase: usa localStorage como fallback
+      coupons = JSON.parse(localStorage.getItem("panillo-config") || "{}").coupons || [];
+    }
+  } catch(e) {
+    coupons = JSON.parse(localStorage.getItem("panillo-config") || "{}").coupons || [];
+  }
+
+  if (coupons.find(c => c.code === code)) { showToast("Cupom já existe!"); return; }
+  coupons.push({ code, pct, validade: validade || null, maxUsos: maxUsos || null, usos: 0 });
+
+  // Salva lista completa (de todos os dispositivos + o novo) no Firestore
+  try {
+    if (db && FB) {
+      if (firestoreDocId) await fbUpdate("appConfig", firestoreDocId, { coupons });
+      else await fbAdd("appConfig", { coupons });
+    }
+  } catch(e) { console.warn("Cupom: Firebase indisponível, salvando só local.", e); }
+
+  // Atualiza localStorage local para manter sincronia
+  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  cfg.coupons = coupons;
+  localStorage.setItem("panillo-config", JSON.stringify(cfg));
+
   document.getElementById("new-coupon-code").value = "";
   document.getElementById("new-coupon-pct").value  = "";
   document.getElementById("new-coupon-validade").value = "";
@@ -8100,13 +8269,28 @@ async function incrementCouponUsage(code) {
 }
 
 async function removeCoupon(idx) {
-  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
-  cfg.coupons = (cfg.coupons||[]).filter((_,i)=>i!==idx);
-  localStorage.setItem("panillo-config", JSON.stringify(cfg));
+  // Busca lista atual do Firestore para não perder cupons criados em outros dispositivos
+  let coupons = [];
+  let firestoreDocId = null;
   try {
-    const docs = await fbGet("appConfig");
-    if (docs.length > 0) await fbUpdate("appConfig", docs[0].id, { coupons: cfg.coupons });
+    if (db && FB) {
+      const docs = await fbGet("appConfig");
+      if (docs.length > 0) { coupons = docs[0].coupons || []; firestoreDocId = docs[0].id; }
+    }
+  } catch(e) {}
+  if (!coupons.length) {
+    coupons = JSON.parse(localStorage.getItem("panillo-config") || "{}").coupons || [];
+  }
+
+  coupons = coupons.filter((_,i) => i !== idx);
+
+  try {
+    if (db && FB && firestoreDocId) await fbUpdate("appConfig", firestoreDocId, { coupons });
   } catch(e) { console.warn("Cupom remove: Firebase indisponível.", e); }
+
+  const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  cfg.coupons = coupons;
+  localStorage.setItem("panillo-config", JSON.stringify(cfg));
   renderCouponsList();
   showToast("Cupom removido!");
 }
