@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panillo — Cookies & Brownies Artesanais</title>
+<!-- Routing imediato: roda antes de DOMContentLoaded e antes do Firebase.
+     Garante que /admin nunca mostra a loja — sem race condition. -->
+<script>
+(function() {
+  var p = window.location.pathname;
+  if (p === "/admin" || p === "/admin/") {
+    // Marca o documento para que o CSS esconda a loja imediatamente
+    document.documentElement.setAttribute("data-route", "admin");
+  }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
@@ -110,6 +121,11 @@
 /* ═══════════════════════════════════════════════════════
    TOKENS
 ═══════════════════════════════════════════════════════ */
+/* Rota /admin: esconde loja e mostra login ANTES do JavaScript carregar.
+   Firebase faz o roteamento final (login → admin se autenticado). */
+html[data-route="admin"] #page-store  { display: none !important; }
+html[data-route="admin"] #page-login  { display: flex !important; }
+
 :root {
   /* ── Paleta Panillo — extrai da logomarca ───────────────────────
      Chocolate escuro: #3D1500  Cookie caramelo: #C4792A
@@ -4126,6 +4142,10 @@ function showPage(id) {
     p.classList.remove("active");
   });
   document.getElementById(id).classList.add("active");
+  // Remove o override de CSS do /admin quando navega para outra página
+  if (id !== "page-login") {
+    document.documentElement.removeAttribute("data-route");
+  }
 }
 
 function goToStore() {
@@ -9180,37 +9200,26 @@ document.addEventListener("DOMContentLoaded", () => {
   loadConfig();
   applyLogo(LOGO_BASE64);
 
-  // Rota /admin → se já autenticado vai direto ao painel, senão abre login
+  // Rota /admin — o CSS já esconde a loja e mostra o login imediatamente
+  // (via data-route="admin" no <html>). Aqui apenas lidamos com o caso raro
+  // onde Firebase já carregou antes do DOMContentLoaded.
   const path = window.location.pathname;
   if (path === "/admin" || path === "/admin/") {
     const currentUser = window._auth?.currentUser;
     if (currentUser) {
+      // Firebase já carregou E usuário já autenticado → vai direto ao painel
       showPage("page-admin");
       loadDashboard();
       showMobBottomNav(true);
-    } else {
-      // Tenta onAuthStateChanged se Firebase já carregou
-      const unsubRoute = window._fbModules?.onAuthStateChanged
-        ? window._fbModules.onAuthStateChanged(window._auth, (user) => {
-            unsubRoute && unsubRoute();
-            if (user) {
-              showPage("page-admin");
-              loadDashboard();
-              showMobBottomNav(true);
-            } else {
-              showPage("page-login");
-            }
-          })
-        : showPage("page-login");
-
-      // Fallback: se firebase-ready demorar, garante que login aparece após 1.5s
-      setTimeout(() => {
-        const storeStillActive = document.getElementById("page-store")?.classList.contains("active");
-        if (storeStillActive && (path === "/admin" || path === "/admin/")) {
-          showPage("page-login");
-        }
-      }, 1500);
+    } else if (window._fbModules?.onAuthStateChanged) {
+      // Firebase carregou mas auth ainda resolvendo
+      const unsub = window._fbModules.onAuthStateChanged(window._auth, (user) => {
+        unsub && unsub();
+        if (user) { showPage("page-admin"); loadDashboard(); showMobBottomNav(true); }
+        // Se não logado: página de login já está visível pelo CSS
+      });
     }
+    // Se Firebase não carregou ainda: firebase-ready cuida do roteamento final
   }
 });
 
