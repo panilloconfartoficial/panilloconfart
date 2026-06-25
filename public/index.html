@@ -5504,18 +5504,14 @@ async function updateOrderStatus(id, newStatus) {
     let stockChanged = false;
     for (const item of (order.itens || [])) {
       if (!item.prodId) continue;
-      const s = allStock[item.prodId] || {};
+      const s = allStock[item.prodId];
+      if (!s?.id) { console.warn("Sem entrada de estoque para:", item.prodId); continue; }
       const newQty = Math.max(0, (s.qty || 0) - (item.qty || 0));
-      allStock[item.prodId] = { ...s, qty: newQty };
       try {
-        const stockDocs = await FB.getDocs(
-          FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prodId))
-        );
-        if (!stockDocs.empty) {
-          await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
-          stockChanged = true;
-        }
-      } catch(e) { console.warn("Erro ao baixar estoque:", e); }
+        await FB.updateDoc(FB.doc(db, "stock", s.id), { qty: newQty });
+        allStock[item.prodId] = { ...s, qty: newQty };
+        stockChanged = true;
+      } catch(e) { console.error("Erro ao baixar estoque:", item.prodId, e); }
     }
     try { await fbUpdate("orders", id, { _stockDecremented: true }); } catch(e) {}
     allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: true } : o);
@@ -5531,18 +5527,14 @@ async function updateOrderStatus(id, newStatus) {
       let stockChanged = false;
       for (const item of (order.itens || [])) {
         if (!item.prodId) continue;
-        const s = allStock[item.prodId] || {};
+        const s = allStock[item.prodId];
+        if (!s?.id) continue;
         const restored = (s.qty || 0) + (item.qty || 0);
-        allStock[item.prodId] = { ...s, qty: restored };
         try {
-          const stockDocs = await FB.getDocs(
-            FB.query(FB.collection(db,"stock"), FB.where("prodId","==",item.prodId))
-          );
-          if (!stockDocs.empty) {
-            await FB.updateDoc(stockDocs.docs[0].ref, { qty: restored });
-            stockChanged = true;
-          }
-        } catch(e) { console.warn("Erro ao restaurar estoque:", e); }
+          await FB.updateDoc(FB.doc(db, "stock", s.id), { qty: restored });
+          allStock[item.prodId] = { ...s, qty: restored };
+          stockChanged = true;
+        } catch(e) { console.error("Erro ao restaurar estoque:", item.prodId, e); }
       }
       try { await fbUpdate("orders", id, { _stockDecremented: false }); } catch(e) {}
       allOrders = allOrders.map(o => o.id === id ? { ...o, _stockDecremented: false } : o);
@@ -5788,20 +5780,19 @@ async function reconcileStock() {
   // Aplica os deltas no Firebase e em allStock
   let changed = false;
   for (const [prodId, delta] of Object.entries(deltas)) {
-    const s = allStock[prodId] || {};
+    const s = allStock[prodId];
+    if (!s?.id) {
+      console.warn("[reconcile] Sem entrada de estoque para:", prodId);
+      continue;
+    }
     const newQty = Math.max(0, (s.qty || 0) - delta);
-    allStock[prodId] = { ...s, qty: newQty };
     try {
-      const stockDocs = await FB.getDocs(
-        FB.query(FB.collection(db, "stock"), FB.where("prodId", "==", prodId))
-      );
-      if (!stockDocs.empty) {
-        await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
-        const nome = allProducts.find(p => p.id === prodId)?.nome || prodId;
-        console.log(`[reconcile] ${nome}: -${delta} → ${newQty} unid.`);
-        changed = true;
-      }
-    } catch(e) { console.warn("[reconcile] Erro ao atualizar estoque:", e); }
+      await FB.updateDoc(FB.doc(db, "stock", s.id), { qty: newQty });
+      allStock[prodId] = { ...s, qty: newQty };
+      const nome = allProducts.find(p => p.id === prodId)?.nome || prodId;
+      console.log(`[reconcile] ${nome}: -${delta} → ${newQty} unid.`);
+      changed = true;
+    } catch(e) { console.error("[reconcile] Erro ao atualizar estoque:", prodId, e); }
   }
 
   // Marca todos os pedidos pendentes como contabilizados
@@ -7188,20 +7179,18 @@ async function confirmarTransferenciaPE(linhas) {
     const qty = parseInt(inputQty?.value) || 0;
     if (qty <= 0) continue;
 
-    const s = allStock[prodId] || {};
-    const novaQty = (s.qty || 0) + qty;
+    const s      = allStock[prodId];
+    const novaQty = (s?.qty || 0) + qty;
 
     try {
-      const docs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId)));
-      if (docs.empty) {
+      if (s?.id) {
+        // Produto já tem entrada no estoque — atualiza diretamente
+        await FB.updateDoc(FB.doc(db, "stock", s.id), { qty: novaQty, ativo: true });
+        allStock[prodId] = { ...s, qty: novaQty, ativo: true };
+      } else {
         // Cria registro de estoque PE ativando o produto
         const ref = await fbAdd("stock", { prodId, qty: novaQty, ativo: true });
         allStock[prodId] = { id: ref.id, qty: novaQty, ativo: true };
-      } else {
-        const docRef = docs.docs[0].ref;
-        const jaAtivo = docs.docs[0].data().ativo || false;
-        await FB.updateDoc(docRef, { qty: novaQty, ativo: true });
-        allStock[prodId] = { ...s, id: docs.docs[0].id, qty: novaQty, ativo: true };
       }
       transferidos++;
     } catch(e) {
@@ -10039,17 +10028,13 @@ async function submitVendaPresencial() {
     let stockChanged = false;
     for (const item of items) {
       if (!item.prodId) continue;
-      const s = allStock[item.prodId] || {};
+      const s = allStock[item.prodId];
+      if (!s?.id) continue;
       const newQty = Math.max(0, (s.qty || 0) - (item.qty || 1));
-      allStock[item.prodId] = { ...s, qty: newQty };
       try {
-        const stockDocs = await FB.getDocs(
-          FB.query(FB.collection(db, "stock"), FB.where("prodId", "==", item.prodId))
-        );
-        if (!stockDocs.empty) {
-          await FB.updateDoc(stockDocs.docs[0].ref, { qty: newQty });
-          stockChanged = true;
-        }
+        await FB.updateDoc(FB.doc(db, "stock", s.id), { qty: newQty });
+        allStock[item.prodId] = { ...s, qty: newQty };
+        stockChanged = true;
       } catch(e) { console.warn("VP: erro ao baixar estoque:", e); }
     }
     // Marca o pedido como já descontado
