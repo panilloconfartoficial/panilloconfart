@@ -4112,6 +4112,7 @@ function setupRealtimeListeners() {
 }
 
 // ─── FIREBASE HELPERS ──────────────────────────────────────────────────
+async function fbAdd(col, data) {
   return FB.addDoc(FB.collection(db, col), { ...data, createdAt: FB.serverTimestamp() });
 }
 async function fbUpdate(col, id, data) {
