@@ -4733,27 +4733,15 @@ async function buscarClienteExistente() {
   let found = null;
   let foundWpp = raw;
 
-  // ── Estratégia 1: endpoint server-side /api/find-client ───────────────
-  let apiAvailable = true;
-  for (const v of variants) {
-    try {
-      const resp = await fetch(`/api/find-client?wpp=${encodeURIComponent(v)}`);
-      if (resp.status === 404) { apiAvailable = false; break; } // endpoint não existe
-      if (!resp.ok) continue;
-      const data = await resp.json();
-      if (data.found) { found = data; foundWpp = v; break; }
-    } catch { apiAvailable = false; break; }
-  }
-
-  // ── Estratégia 2: getDoc direto no Firestore (ID = wpp normalizado) ───
-  // Usado quando o endpoint server-side não existe ou retorna 404.
-  if (!found && !apiAvailable && db && FB) {
+  // Busca diretamente no Firestore por ID do documento (= número do WhatsApp normalizado).
+  // O endpoint /api/find-client nunca foi criado, então vamos direto à fonte.
+  if (db && FB) {
     for (const v of variants) {
       try {
         const snap = await FB.getDoc(FB.doc(db, "clients", v));
         if (snap.exists()) {
           const d = snap.data();
-          found = { found: true, nome: d.nome, pedidos: d.pedidos, totalGasto: d.totalGasto, email: d.email||"", bday: d.bday||"", obs: d.obs||"" };
+          found = { nome: d.nome, pedidos: d.pedidos, totalGasto: d.totalGasto, email: d.email||"", bday: d.bday||"", obs: d.obs||"" };
           foundWpp = v;
           break;
         }
