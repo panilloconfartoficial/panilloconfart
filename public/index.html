@@ -3962,11 +3962,13 @@ window.addEventListener("firebase-ready", () => {
       const loginActive = document.getElementById("page-login").classList.contains("active");
       if (loginActive || onAdminRoute) {
         showPage("page-admin");
-        // loadDashboard será chamado automaticamente dentro de loadOrders()
         showMobBottomNav(true);
       }
+      // Inicia listeners de coleções privadas agora que auth está confirmado
+      setupAdminListeners();
     } else {
-      // Sem sessão ativa e na rota /admin → exibe tela de login
+      // Para os listeners privados ao deslogar
+      ["orders","fiado","ingredients","clients"].forEach(k => _stopListen(k));
       if (onAdminRoute) {
         showPage("page-login");
       }
@@ -4018,7 +4020,9 @@ function isAdminVisible() {
 function setupRealtimeListeners() {
   if (!db || !FB?.onSnapshot) return;
 
-  // ── Produtos (loja + admin) ───────────────────────────────────────────
+  // ── Coleções PÚBLICAS (sem autenticação) ─────────────────────────────
+
+  // Produtos (loja + admin)
   _stopListen("products");
   _listeners.products = FB.onSnapshot(FB.collection(db, "products"), snap => {
     allProducts = snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -4027,7 +4031,7 @@ function setupRealtimeListeners() {
     if (isAdminVisible()) renderAdminProducts();
   }, e => console.warn("RT products:", e.message));
 
-  // ── Estoque PE (loja + admin) ─────────────────────────────────────────
+  // Estoque PE (loja + admin)
   _stopListen("stock");
   _listeners.stock = FB.onSnapshot(FB.collection(db, "stock"), snap => {
     allStock = {};
@@ -4036,15 +4040,17 @@ function setupRealtimeListeners() {
       allStock[dat.prodId] = { id: d.id, qty: dat.qty || 0, ativo: dat.ativo || false };
     });
     renderPEProducts();
+    if (isAdminVisible() && document.getElementById("sec-estoque")?.classList.contains("hidden") === false) {
+      renderStockAdmin();
+    }
   }, e => console.warn("RT stock:", e.message));
 
-  // ── Depoimentos (público + admin) ─────────────────────────────────────
+  // Depoimentos (público + admin)
   _stopListen("depoimentos");
   _listeners.depoimentos = FB.onSnapshot(FB.collection(db, "depoimentos"), snap => {
     _allDepoimentos = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     const badge = document.getElementById("badge-depoimentos");
     if (badge) { badge.textContent = _allDepoimentos.length; badge.style.display = _allDepoimentos.length ? "" : "none"; }
-    // Renderiza grid público
     const grid = document.getElementById("depoimentos-grid");
     if (grid) {
       const visiveis = _allDepoimentos.filter(d => !d.oculto);
@@ -4061,7 +4067,7 @@ function setupRealtimeListeners() {
     if (isAdminVisible()) renderDepoimentosAdmin();
   }, e => console.warn("RT depoimentos:", e.message));
 
-  // ── AppConfig (endereço, pix, cupons) ─────────────────────────────────
+  // AppConfig (endereço, pix, cupons)
   _stopListen("config");
   _listeners.config = FB.onSnapshot(FB.collection(db, "appConfig"), snap => {
     if (!snap.docs.length) return;
@@ -4071,12 +4077,17 @@ function setupRealtimeListeners() {
     localStorage.setItem("panillo-config", JSON.stringify(merged));
     if (remote.pixKey)    { PIX_KEY    = remote.pixKey;    window._pixKey    = remote.pixKey;    }
     if (remote.wppNumber) { WPP_NUMBER = remote.wppNumber; window._wppNumber = remote.wppNumber; try { applyFooterWpp(remote.wppNumber); } catch {} }
-    // Aplica logo remota assim que disponível — substitui a logo hardcoded do código
     if (remote.logo) applyLogo(remote.logo);
     if (isAdminVisible()) renderCouponsList();
   }, e => console.warn("RT config:", e.message));
+}
 
-  // ── Pedidos (admin — pode falhar com permission-denied para público) ───
+// Listeners de coleções privadas — só chamado após autenticação confirmada.
+// Evita "permission-denied" inicial que mata o listener permanentemente.
+function setupAdminListeners() {
+  if (!db || !FB?.onSnapshot) return;
+
+  // Pedidos
   _stopListen("orders");
   _listeners.orders = FB.onSnapshot(FB.collection(db, "orders"), snap => {
     allOrders = snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -4087,7 +4098,7 @@ function setupRealtimeListeners() {
     if (isAdminVisible()) renderOrders();
   }, e => console.warn("RT orders:", e.message));
 
-  // ── Contas fiado (admin) ──────────────────────────────────────────────
+  // Contas fiado
   _stopListen("fiado");
   _listeners.fiado = FB.onSnapshot(FB.collection(db, "fiadoAccounts"), snap => {
     allFiadoAccounts = snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -4097,14 +4108,14 @@ function setupRealtimeListeners() {
     if (isAdminVisible()) renderFiadoAdmin();
   }, e => console.warn("RT fiado:", e.message));
 
-  // ── Ingredientes (admin) ──────────────────────────────────────────────
+  // Ingredientes
   _stopListen("ingredients");
   _listeners.ingredients = FB.onSnapshot(FB.collection(db, "ingredients"), snap => {
     allIngredients = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     if (isAdminVisible()) renderIngredients();
   }, e => console.warn("RT ingredients:", e.message));
 
-  // ── Clientes (admin — background) ─────────────────────────────────────
+  // Clientes (background)
   _stopListen("clients");
   _listeners.clients = FB.onSnapshot(FB.collection(db, "clients"), snap => {
     allClients = snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -5340,7 +5351,7 @@ async function addAuditLog(refId, msg, tipo) {
         .catch(e => {
           if (e?.code === "permission-denied") {
             window._historicoPermDenied = true;
-            console.warn("Panillo: coleção 'historico' sem permissão de escrita no Firestore. Adicione a regra nas configurações do Firebase.");
+            // Regra não configurada no Firestore — falha silenciosa, não afeta funcionamento
           }
         });
     }
@@ -8373,34 +8384,56 @@ async function applyCoupon() {
   const discRow = document.getElementById("discount-row");
   if (wrap) wrap.innerHTML = `<span style="font-size:12px;color:var(--muted);">Verificando cupom...</span>`;
 
-  try {
-    // Valida cupom via endpoint server-side que usa Admin SDK para ler o Firestore.
-    // Isso contorna o bloqueio das regras públicas de leitura do Firestore.
-    const resp = await fetch(`/api/validate-coupon?code=${encodeURIComponent(code)}`);
-    const data = await resp.json();
+  // ── Validação local (usa cupons do appConfig em cache) ────────────────
+  // O listener de config já mantém os cupons atualizados em localStorage.
+  const cfg     = JSON.parse(localStorage.getItem("panillo-config") || "{}");
+  const coupons = cfg.coupons || [];
+  const coupon  = coupons.find(c => (c.code || "").toUpperCase() === code);
 
-    if (resp.ok && data.valid) {
-      activeCoupon = { code, pct: data.pct };
-      if (wrap) wrap.innerHTML = `<div class="coupon-badge">✓ ${code} — ${data.pct}% de desconto</div>`;
-      updateCartUI();
-      showToast(`Cupom aplicado: ${data.pct}% de desconto!`);
+  if (!coupon) {
+    activeCoupon = null;
+    if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">Cupom inválido ou não encontrado</div>`;
+    if (discRow) discRow.style.display = "none";
+    updateCartUI();
+    return;
+  }
+
+  // Verificar validade
+  if (coupon.validade) {
+    // Suporta YYYY-MM-DD (date input) e DD/MM/YYYY (legado)
+    let exp;
+    if (coupon.validade.includes("-")) {
+      exp = new Date(coupon.validade + "T23:59:59");
     } else {
+      const [dd, mm, yy] = coupon.validade.split("/");
+      exp = new Date(`${yy}-${mm}-${dd}T23:59:59`);
+    }
+    if (exp < new Date()) {
       activeCoupon = null;
-      const msg = data.reason === "expirado"  ? "Cupom expirado"
-                : data.reason === "esgotado"  ? "Cupom atingiu o limite de usos"
-                : (data.error || "Cupom inválido ou não encontrado");
-      if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">${msg}</div>`;
+      if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">Cupom expirado</div>`;
       if (discRow) discRow.style.display = "none";
       updateCartUI();
+      return;
     }
-  } catch(e) {
-    // Endpoint ainda não existe ou erro de rede: aceita otimisticamente
-    // e deixa o servidor validar ao finalizar o pedido (/api/create-order).
-    console.warn("validate-coupon indisponível, aceitando otimisticamente:", e.message);
-    activeCoupon = { code, pct: null, pendente: true };
-    if (wrap) wrap.innerHTML = `<div class="coupon-badge" style="background:#FDF3DC;color:#7A5A00;">⏳ ${code} — validando no envio…</div>`;
-    updateCartUI();
   }
+
+  // Verificar limite de usos
+  const maxUsos = parseInt(coupon.maxUsos) || 0;
+  const usos    = parseInt(coupon.usos)    || 0;
+  if (maxUsos > 0 && usos >= maxUsos) {
+    activeCoupon = null;
+    if (wrap) wrap.innerHTML = `<div style="font-size:12px;color:#993C1D;margin-bottom:6px;">Cupom atingiu o limite de usos</div>`;
+    if (discRow) discRow.style.display = "none";
+    updateCartUI();
+    return;
+  }
+
+  // ✅ Cupom válido
+  const pct = parseFloat(coupon.pct) || 0;
+  activeCoupon = { code, pct };
+  if (wrap) wrap.innerHTML = `<div class="coupon-badge">✓ ${code} — ${pct}% de desconto</div>`;
+  updateCartUI();
+  showToast(`Cupom aplicado: ${pct}% de desconto!`);
 }
 
 // ─── CUSTOMER PORTAL ───────────────────────────────────
