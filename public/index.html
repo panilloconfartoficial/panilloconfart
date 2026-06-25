@@ -124,7 +124,13 @@
 /* Rota /admin: esconde loja e mostra login ANTES do JavaScript carregar.
    Firebase faz o roteamento final (login → admin se autenticado). */
 html[data-route="admin"] #page-store  { display: none !important; }
-html[data-route="admin"] #page-login  { display: flex !important; }
+html[data-route="admin"] #page-login  { display: block !important; }
+
+/* Login-wrap cobre toda a viewport com o fundo chocolate */
+.login-wrap {
+  width: 100vw; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: var(--teal-dark);
+}
 
 :root {
   /* ── Paleta Panillo — extrai da logomarca ───────────────────────
@@ -1214,10 +1220,6 @@ img { max-width: 100%; display: block; }
 .status-select { border: 1px solid var(--border-mid); border-radius: 8px; padding: 4px 8px; font-size: 12px; background: var(--white); color: var(--text); outline: none; }
 
 /* ─── LOGIN ─── */
-.login-wrap {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: var(--teal-dark);
-}
 .login-box {
   background: var(--white); border-radius: 20px;
   padding: 40px 36px; width: 360px; text-align: center;
@@ -2493,7 +2495,7 @@ img { max-width: 100%; display: block; }
       <span class="sb-label">Contas Fiado</span>
       <span class="sb-badge" id="badge-fiado">0</span>
     </div>
-    <div class="sb-item" onclick="showAdminSection('depoimentos',this)">
+    <div class="sb-item" onclick="showAdminSection('admin-depoimentos',this)">
       <i class="ti ti-message-star sb-icon"></i>
       <span class="sb-label">Depoimentos</span>
       <span class="sb-badge" id="badge-depoimentos" style="display:none;">0</span>
@@ -3668,7 +3670,7 @@ img { max-width: 100%; display: block; }
     </div>
 
     <!-- ── DEPOIMENTOS ADMIN ── -->
-    <div id="sec-depoimentos" class="hidden">
+    <div id="sec-admin-depoimentos" class="hidden">
       <div class="admin-topbar">
         <div style="display:flex;align-items:center;gap:12px;">
           <button class="hamburger" onclick="toggleAdminSidebar()" aria-label="Menu"><span></span><span></span><span></span></button>
@@ -4239,7 +4241,7 @@ function showAdminSection(sec, el) {
     if (dt && !dt.value) dt.value = today;
     loadIndicadores("mes");
   }
-  if (sec === "depoimentos") renderDepoimentosAdmin();
+  if (sec === "admin-depoimentos") renderDepoimentosAdmin();
   if (sec === "metas")       loadMetas();
   if (sec === "planejamento") loadPlanejamento();
   if (sec === "fluxo") {
@@ -11018,37 +11020,38 @@ async function submitAvaliacao() {
 async function renderDepoimentosAdmin() {
   const list = document.getElementById("dep-admin-list");
   if (!list) return;
-  list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px;">Carregando...</div>';
+
+  // Usa _allDepoimentos mantido pelo listener em tempo real.
+  // Se ainda estiver vazio, faz um fetch manual como fallback.
+  if (!_allDepoimentos.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px;">Carregando...</div>';
+    try {
+      const docs = await fbGet("depoimentos");
+      _allDepoimentos = docs || [];
+    } catch {}
+  }
+
+  // Atualiza badge da sidebar
+  const badge = document.getElementById("badge-depoimentos");
+  if (badge) {
+    badge.textContent = _allDepoimentos.length;
+    badge.style.display = _allDepoimentos.length ? "" : "none";
+  }
+
+  const filtro = document.getElementById("dep-filter")?.value || "todos";
+  let filtrados = _allDepoimentos;
+  if (filtro === "visiveis") filtrados = filtrados.filter(d => !d.oculto);
+  if (filtro === "ocultos")  filtrados = filtrados.filter(d =>  d.oculto);
+
+  if (!filtrados.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px;">Nenhuma avaliação encontrada.</div>';
+    return;
+  }
+
+  // Ordenar por data desc
+  filtrados.sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 
   try {
-    const docs  = await fbGet("depoimentos");
-    _allDepoimentos = docs || [];
-
-    // Atualiza badge da sidebar
-    const badge = document.getElementById("badge-depoimentos");
-    if (badge) {
-      const total = _allDepoimentos.length;
-      badge.textContent = total;
-      badge.style.display = total ? "" : "none";
-    }
-
-    const filtro = document.getElementById("dep-filter")?.value || "todos";
-    let filtrados = _allDepoimentos;
-    if (filtro === "visiveis") filtrados = filtrados.filter(d => !d.oculto);
-    if (filtro === "ocultos")  filtrados = filtrados.filter(d =>  d.oculto);
-
-    if (!filtrados.length) {
-      list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px;">Nenhuma avaliação encontrada.</div>';
-      return;
-    }
-
-    // Ordenar por data desc
-    filtrados.sort((a,b) => {
-      const ta = a.createdAt?.seconds || 0;
-      const tb = b.createdAt?.seconds || 0;
-      return tb - ta;
-    });
-
     list.innerHTML = filtrados.map(d => {
       const estrelas = "★".repeat(d.estrelas||5) + "☆".repeat(5-(d.estrelas||5));
       const data = d.createdAt?.seconds ? new Date(d.createdAt.seconds*1000).toLocaleDateString("pt-BR") : "—";
@@ -11086,7 +11089,7 @@ async function renderDepoimentosAdmin() {
       </div>`;
     }).join("");
   } catch(e) {
-    list.innerHTML = '<div style="color:#993C1D;font-size:13px;text-align:center;padding:40px;">Erro ao carregar depoimentos.</div>';
+    list.innerHTML = '<div style="color:#993C1D;font-size:13px;text-align:center;padding:40px;">Erro ao renderizar depoimentos.</div>';
   }
 }
 
