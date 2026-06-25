@@ -5916,7 +5916,11 @@ async function renderFiadoAdmin() {
   if (!list) return;
 
   const active = allFiadoAccounts.filter(a => a.autorizado);
-  const totalAberto = active.reduce((s,a) => s + (a.saldo || 0), 0);
+
+  // totalAberto calculado a partir dos pedidos NÃO pagos (fonte de verdade)
+  const totalAberto = (allOrders || [])
+    .filter(o => o.pagamento === "fiado" && !o.pagamentoConfirmado && o.status !== "cancelado")
+    .reduce((s, o) => s + (o.total || 0), 0);
 
   // Calcular recebido este mês
   const now = new Date();
@@ -5984,13 +5988,9 @@ async function renderFiadoAdmin() {
   }
 
   list.innerHTML = filtered.map((a, index) => {
-    const saldo = a.saldo || 0;
-    const badgeClass = saldo > 0 ? "fiado-danger" : "fiado-zero";
-    const badgeText = saldo > 0 ? `R$ ${saldo.toFixed(2).replace(".",",")} em aberto` : "R$ 0,00 — quitado";
-    const hist = (a.historico || []).slice().reverse().slice(0,5);
     const initials = (a.clientNome || "?").substring(0,2).toUpperCase();
 
-    // Busca pedidos reais do allOrders para este cliente (por wpp)
+    // ── Busca pedidos reais do allOrders para este cliente (por wpp) ─────
     const clientWppClean = (a.clientWpp || "").replace(/\D/g, "");
     const pedidosFiado = (allOrders || []).filter(o =>
       o.pagamento === "fiado" &&
@@ -5998,6 +5998,22 @@ async function renderFiadoAdmin() {
       o.status !== "cancelado"
     ).sort((x,y) => (y.createdAt?.seconds||0) - (x.createdAt?.seconds||0));
 
+    // ── Saldo real = soma dos pedidos NÃO pagos (fonte de verdade) ────────
+    // a.saldo no Firestore pode estar desatualizado; recalculamos aqui.
+    const saldoReal = pedidosFiado
+      .filter(o => !o.pagamentoConfirmado)
+      .reduce((s, o) => s + (o.total || 0), 0);
+
+    // Se saldo armazenado diverge do real, corrige em background
+    if (Math.abs(saldoReal - (a.saldo || 0)) > 0.001 && a.id) {
+      fbUpdate("fiadoAccounts", a.id, { saldo: saldoReal }).catch(() => {});
+      a.saldo = saldoReal; // atualiza em memória imediatamente
+    }
+
+    const saldo     = saldoReal;
+    const badgeClass = saldo > 0 ? "fiado-danger" : "fiado-zero";
+    const badgeText  = saldo > 0 ? `R$ ${saldo.toFixed(2).replace(".",",")} em aberto` : "R$ 0,00 — quitado";
+    const hist = (a.historico || []).slice().reverse().slice(0,5);
     const pedCount = pedidosFiado.length;
 
     // Monta HTML dos pedidos fiado com desconto individual
