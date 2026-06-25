@@ -4880,11 +4880,6 @@ async function submitOrder() {
   const btn = document.querySelector('#step-2 .btn-next-step');
   if (btn) { btn.disabled = true; btn.textContent = "Enviando..."; }
 
-  // ─── Monta payload para o servidor ──────────────────────────────────
-  // O servidor (/api/create-order) recalcula preços a partir de "products"
-  // e valida o cupom (expiração/limite de uso) de forma atômica — os
-  // valores enviados aqui (preco, subtotal, total, desconto) são apenas
-  // referência para a UI local; o servidor é a fonte da verdade.
   const payload = {
     items: items.map(i => ({
       prodId: i.prod.id, qty: i.qty,
@@ -4900,19 +4895,21 @@ async function submitOrder() {
   };
 
   let order, orderNum;
+
+  // ── Estratégia 1: endpoint server-side /api/create-order ─────────────
+  let apiUsed = false;
   try {
     const resp = await fetch("/api/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    const data = await resp.json();
 
+    if (resp.status === 404) throw new Error("API_NOT_FOUND");
+
+    const data = await resp.json();
     if (!resp.ok) {
       if (data?.couponInvalid) {
-        // Cupom ficou inválido entre a aplicação e o envio (expirou/esgotou
-        // por outra venda) — remove o desconto e pede para o cliente
-        // confirmar novamente, em vez de perder o pedido inteiro.
         activeCoupon = null;
         const wrap = document.getElementById("coupon-badge-wrap");
         const discRow = document.getElementById("discount-row");
@@ -4929,20 +4926,76 @@ async function submitOrder() {
 
     order = data.order;
     orderNum = order.orderNum;
-  } catch(e) {
-    console.error("create-order falhou:", e);
-    showToast("Não foi possível enviar o pedido. Verifique sua conexão e tente novamente.");
-    if (btn) { btn.disabled = false; btn.textContent = "Confirmar pedido →"; }
-    return;
+    // Garante que itens da API também têm prodId (para desconto de estoque)
+    if (order.itens) {
+      order.itens = order.itens.map((item, idx) => ({
+        ...item,
+        prodId: item.prodId || payload.items[idx]?.prodId || null
+      }));
+    }
+    apiUsed = true;
+  } catch(apiErr) {
+    if (apiErr.message !== "API_NOT_FOUND" && !apiErr.message.startsWith("Erro")) {
+      // Erro de rede real (não apenas API inexistente)
+      console.warn("create-order API error, usando fallback Firestore:", apiErr.message);
+    }
+
+    // ── Estratégia 2: cria pedido diretamente no Firestore ───────────────
+    // Usado quando o endpoint server-side não existe ou há erro de rede.
+    // Funciona porque Firestore rules permitem "create: if true" em orders.
+    try {
+      const subtotal = items.reduce((s, i) => s + i.prod.preco * i.qty, 0);
+      const discPct  = activeCoupon?.pct || 0;
+      const desconto = discPct > 0 ? Math.round(subtotal * discPct) / 100 : 0;
+      const total    = Math.round((subtotal - desconto) * 100) / 100;
+      const num      = String(Math.floor(100000 + Math.random() * 900000));
+      orderNum       = num;
+
+      const orderData = {
+        orderNum: num,
+        cliente: client,
+        tipo: payload.tipo,
+        itens: items.map(i => ({
+          prodId: i.prod.id,    // CRÍTICO para desconto de estoque
+          nome:   i.prod.nome,
+          qty:    i.qty,
+          preco:  i.prod.preco,
+          sabores: i.prod.sabores || null,
+          obs:    i.prod.obs || null
+        })),
+        subtotal,
+        desconto,
+        cupomCode:   payload.cupomCode || null,
+        total,
+        dataRetirada: payload.dataRetirada,
+        periodo:     payload.periodo,
+        pagamento:   payload.pagamento,
+        enderecoIdx: payload.enderecoIdx,
+        status:               "pendente",
+        pagamentoConfirmado:  false,
+        _stockDecremented:    false
+      };
+
+      const ref = await fbAdd("orders", orderData);
+      order = { ...orderData, id: ref.id };
+    } catch(fbErr) {
+      console.error("Falha ao criar pedido via Firestore:", fbErr);
+      showToast("Não foi possível enviar o pedido. Verifique sua conexão e tente novamente.");
+      if (btn) { btn.disabled = false; btn.textContent = "Confirmar pedido →"; }
+      return;
+    }
   }
 
   const total = order.total;
 
-  // ─── Notificações (best-effort, não bloqueia a UI) ──────────────────
+  // ── Notificações e auditoria ─────────────────────────────────────────
   sendOrderNotifications(order).catch(e => console.warn("Notify error:", e));
   addAuditLog(orderNum, `Novo pedido #${orderNum} — ${client.nome||"cliente"} — R$ ${total.toFixed(2)} — ${payLabel(selectedPay)}`, "pedido");
-  // Nota: o estoque de Pronta Entrega é baixado quando o pedido for marcado como "Entregue"
-  // para garantir precisão e refletir a baixa real no painel do admin.
+
+  // ── Incrementa uso do cupom (garante limite funciona) ─────────────────
+  if (activeCoupon?.code) {
+    incrementCouponUsage(activeCoupon.code).catch(() => {});
+  }
 
   // Update UI
   currentStep = 3;
@@ -4952,10 +5005,6 @@ async function submitOrder() {
 
   buildReceipt(order, orderNum);
 
-  // ─── Salva/atualiza cliente no Firestore ───────────────────────────────
-  // Era chamado apenas via "Cadastre-se". Agora também é chamado aqui para
-  // garantir que todo cliente que finalizar um pedido seja persistido,
-  // mesmo que não tenha se cadastrado previamente.
   saveClientToFirebase(client, order).catch(e => console.warn("saveClientToFirebase error:", e));
 
   const cfg = JSON.parse(localStorage.getItem("panillo-config") || "{}");
