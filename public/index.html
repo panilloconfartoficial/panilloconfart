@@ -5855,40 +5855,56 @@ function renderStockAdmin() {
 }
 
 async function saveStockQty(prodId) {
-  const input = document.getElementById("stock-qty-" + prodId);
-  const qty = parseInt(input.value) || 0;
-  const s = allStock[prodId] || { ativo: false };
+  const input    = document.getElementById("stock-qty-" + prodId);
+  const qty      = parseInt(input?.value) || 0;
+  const existing = allStock[prodId];
+
   try {
-    const docs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId)));
-    if (docs.empty) {
-      const ref = await fbAdd("stock", { prodId, qty, ativo: s.ativo || false });
-      allStock[prodId] = { id: ref.id, qty, ativo: s.ativo || false };
+    if (existing?.id) {
+      // Documento já existe — atualiza diretamente pelo ID (sem query)
+      await FB.updateDoc(FB.doc(db, "stock", existing.id), { qty });
+      allStock[prodId] = { ...existing, qty };
     } else {
-      await FB.updateDoc(docs.docs[0].ref, { qty });
-      allStock[prodId] = { ...s, id: docs.docs[0].id, qty };
+      // Primeiro cadastro deste produto no estoque
+      const ref = await fbAdd("stock", { prodId, qty, ativo: false });
+      allStock[prodId] = { id: ref.id, qty, ativo: false };
     }
     showToast("Estoque salvo!");
-    addAuditLog(prodId, `Estoque atualizado — ${allProducts.find(p=>p.id===prodId)?.nome||prodId}: ${qty} unid.`, "estoque");
+    addAuditLog(prodId, `Estoque: ${allProducts.find(p=>p.id===prodId)?.nome||prodId} → ${qty} unid.`, "estoque");
     renderPEProducts();
-  } catch(e) { showToast("Erro ao salvar estoque"); console.error(e); }
+  } catch(e) {
+    showToast("Erro ao salvar estoque");
+    console.error("saveStockQty:", prodId, e);
+  }
 }
 
 async function toggleStockProduct(prodId, currentState) {
   const newState = !currentState;
-  const qty = parseInt(document.getElementById("stock-qty-" + prodId)?.value) || 0;
+  const inputVal = parseInt(document.getElementById("stock-qty-" + prodId)?.value) || 0;
+  // Garante qty mínimo de 1 ao ativar — produto com qty=0 não aparece na loja
+  const qty      = newState ? Math.max(inputVal, 1) : inputVal;
+  const existing = allStock[prodId];
+
   try {
-    const docs = await FB.getDocs(FB.query(FB.collection(db,"stock"), FB.where("prodId","==",prodId)));
-    if (docs.empty) {
+    if (existing?.id) {
+      // Atualiza documento existente diretamente pelo ID
+      await FB.updateDoc(FB.doc(db, "stock", existing.id), { ativo: newState, qty });
+      allStock[prodId] = { ...existing, ativo: newState, qty };
+    } else {
+      // Cria documento novo (produto ainda não tinha entrada no estoque)
       const ref = await fbAdd("stock", { prodId, qty, ativo: newState });
       allStock[prodId] = { id: ref.id, qty, ativo: newState };
-    } else {
-      await FB.updateDoc(docs.docs[0].ref, { ativo: newState, qty });
-      allStock[prodId] = { ...(allStock[prodId]||{}), id: docs.docs[0].id, qty, ativo: newState };
     }
-    showToast(newState ? "Produto ativado para Pronta Entrega!" : "Produto removido da Pronta Entrega!");
+    const nome = allProducts.find(p => p.id === prodId)?.nome || prodId;
+    showToast(newState
+      ? `✅ ${nome} ativado para Pronta Entrega (${qty} un.)`
+      : `⏸ ${nome} removido da Pronta Entrega`);
     renderStockAdmin();
     renderPEProducts();
-  } catch(e) { showToast("Erro ao alterar status"); console.error(e); }
+  } catch(e) {
+    showToast("Erro ao alterar status");
+    console.error("toggleStockProduct:", prodId, e);
+  }
 }
 
 // ─── ADMIN: CONTAS FIADO ───────────────────────────────
