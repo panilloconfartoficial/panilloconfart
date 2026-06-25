@@ -4640,11 +4640,22 @@ function renderStepBar(active) {
 }
 
 function renderOrderSummary(elId) {
-  const items = Object.values(cart);
-  const total = items.reduce((s,i) => s + i.prod.preco * i.qty, 0);
+  const items    = Object.values(cart);
+  const subtotal = items.reduce((s,i) => s + i.prod.preco * i.qty, 0);
+  const discPct  = activeCoupon?.pct || 0;
+  const discVal  = discPct > 0 ? subtotal * discPct / 100 : 0;
+  const total    = subtotal - discVal;
+
+  const discHtml = discPct > 0 ? `
+    <div class="os-item" style="color:#2E7D32;font-size:13px;">
+      <span class="name">✓ Cupom ${activeCoupon.code} (${discPct}%)</span>
+      <span class="val" style="color:#2E7D32;">−R$ ${discVal.toFixed(2).replace(".",",")}</span>
+    </div>` : "";
+
   document.getElementById(elId).innerHTML = `
     <div class="os-title">Resumo do pedido</div>
     ${items.map(i=>`<div class="os-item"><span class="name">${i.prod.nome} × ${i.qty}</span><span class="val">R$ ${(i.prod.preco*i.qty).toFixed(2).replace(".",",")}</span></div>`).join("")}
+    ${discHtml}
     <div class="os-divider"></div>
     <div class="os-total"><span class="lbl">Total</span><span class="val">R$ ${total.toFixed(2).replace(".",",")}</span></div>`;
 }
