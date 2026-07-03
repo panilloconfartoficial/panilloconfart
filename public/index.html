@@ -23,7 +23,7 @@
 <!-- Firebase SDKs -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { initializeFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, increment, onSnapshot }
+  import { initializeFirestore, collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, increment, onSnapshot, runTransaction }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -71,7 +71,7 @@
   window._pixKey    = cfg.pixKey;
   window._fbModules = {
     collection, addDoc, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc,
-    query, where, orderBy, serverTimestamp, increment, onSnapshot,
+    query, where, orderBy, serverTimestamp, increment, onSnapshot, runTransaction,
     signInWithEmailAndPassword, signOut, onAuthStateChanged
   };
 
@@ -5831,37 +5831,71 @@ async function reconcileStock() {
     }
   }
 
-  // Aplica os deltas no Firebase e em allStock
-  let changed = false;
-  for (const [prodId, delta] of Object.entries(deltas)) {
+  // Só entra na transação quem tem entrada de estoque cadastrada.
+  const stockRefs = []; // { prodId, stockId }
+  for (const prodId of Object.keys(deltas)) {
     const s = allStock[prodId];
-    if (!s?.id) {
-      console.warn("[reconcile] Sem entrada de estoque para:", prodId);
-      continue;
-    }
-    const newQty = Math.max(0, (s.qty || 0) - delta);
-    try {
-      await FB.updateDoc(FB.doc(db, "stock", s.id), { qty: newQty });
-      allStock[prodId] = { ...s, qty: newQty };
-      const nome = allProducts.find(p => p.id === prodId)?.nome || prodId;
-      console.log(`[reconcile] ${nome}: -${delta} → ${newQty} unid.`);
-      changed = true;
-    } catch(e) { console.error("[reconcile] Erro ao atualizar estoque:", prodId, e); }
+    if (s?.id) stockRefs.push({ prodId, stockId: s.id });
+    else console.warn("[reconcile] Sem entrada de estoque para:", prodId);
   }
 
-  // Marca todos os pedidos pendentes como contabilizados
-  for (const order of pending) {
-    try { await fbUpdate("orders", order.id, { _stockDecremented: true }); } catch(e) {}
+  const newQtys = {}; // preenchido dentro da transação, para log/UI depois
+
+  try {
+    // Tudo (leitura + escrita de estoque + flag dos pedidos) roda em UMA
+    // transação atômica: ou tudo é confirmado no servidor, ou nada é.
+    // Isso elimina o cenário em que o estoque era descontado mas a flag
+    // _stockDecremented falhava em gravar (ex: queda de rede no meio do
+    // processo) — o que fazia o mesmo pedido ser reprocessado e o estoque
+    // ser descontado de novo na próxima vez que o painel carregasse.
+    // Também elimina a corrida entre abas/dispositivos abertos ao mesmo
+    // tempo: o Firestore serializa transações que tocam os mesmos
+    // documentos, refazendo a leitura automaticamente se necessário.
+    await FB.runTransaction(db, async (tx) => {
+      // 1) TODAS as leituras primeiro — exigência do Firestore para transações.
+      //    Lê o valor atual direto do servidor, não do cache local `allStock`,
+      //    que pode estar desatualizado se outra aba já mexeu no estoque.
+      const stockSnaps = {};
+      for (const { prodId, stockId } of stockRefs) {
+        stockSnaps[prodId] = await tx.get(FB.doc(db, "stock", stockId));
+      }
+
+      // 2) Calcula os novos valores a partir do dado lido AGORA, dentro da transação.
+      for (const { prodId, stockId } of stockRefs) {
+        const current = stockSnaps[prodId].data()?.qty || 0;
+        newQtys[prodId] = Math.max(0, current - deltas[prodId]);
+      }
+
+      // 3) TODAS as escritas no mesmo commit atômico: estoque + flag dos pedidos.
+      for (const { prodId, stockId } of stockRefs) {
+        tx.update(FB.doc(db, "stock", stockId), { qty: newQtys[prodId] });
+      }
+      for (const order of pending) {
+        tx.update(FB.doc(db, "orders", order.id), { _stockDecremented: true });
+      }
+    });
+  } catch (e) {
+    // Se a transação falhar (ex: rede caiu de vez), NADA foi aplicado —
+    // nem estoque nem flag. O reconcile tenta de novo no próximo load,
+    // sem risco de desconto duplicado.
+    console.error("[reconcile] Falha ao reconciliar estoque — nada foi alterado:", e);
+    return;
+  }
+
+  // Só atualiza o estado local depois que o servidor confirmou a transação.
+  for (const { prodId, stockId } of stockRefs) {
+    const s = allStock[prodId];
+    allStock[prodId] = { ...s, qty: newQtys[prodId] };
+    const nome = allProducts.find(p => p.id === prodId)?.nome || prodId;
+    console.log(`[reconcile] ${nome}: -${deltas[prodId]} → ${newQtys[prodId]} unid.`);
   }
   allOrders = allOrders.map(o =>
     pending.some(p => p.id === o.id) ? { ...o, _stockDecremented: true } : o
   );
 
-  if (changed) {
-    console.log("[reconcile] Estoque corrigido com sucesso.");
-    renderStockAdmin();
-    renderPEProducts();
-  }
+  console.log("[reconcile] Estoque corrigido com sucesso.");
+  renderStockAdmin();
+  renderPEProducts();
 }
 
 function renderStockAdmin() {
