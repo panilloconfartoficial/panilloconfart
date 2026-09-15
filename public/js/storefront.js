@@ -318,6 +318,11 @@ async function submitClientRegister() {
     errEl.style.display = "block";
     return;
   }
+  if (!document.getElementById("crb-consent").checked) {
+    errEl.textContent = "Confirme a autorização de uso dos seus dados para continuar.";
+    errEl.style.display = "block";
+    return;
+  }
 
   btn.textContent = "Salvando...";
   btn.disabled = true;
@@ -619,6 +624,7 @@ async function goStep(n) {
     const nome = document.getElementById("f-nome").value.trim();
     const wpp  = document.getElementById("f-wpp").value.trim();
     if (!nome || !wpp) { showToast("Preencha nome e WhatsApp!"); return; }
+    if (!document.getElementById("f-consent").checked) { showToast("Confirme a autorização de uso dos seus dados para continuar."); return; }
     const client = {
       nome, wpp,
       email: document.getElementById("f-email").value.trim(),

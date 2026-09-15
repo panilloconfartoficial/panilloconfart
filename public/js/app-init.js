@@ -229,6 +229,14 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove("show"), 3000);
 }
 
+// ─── POLÍTICA DE PRIVACIDADE (LGPD) ─────────────────────
+function openPrivacyModal() {
+  document.getElementById("privacy-modal").classList.add("open");
+}
+function closePrivacyModal() {
+  document.getElementById("privacy-modal").classList.remove("open");
+}
+
 // ─── PAGE ROUTING ──────────────────────────────────────
 function showPage(id) {
   document.querySelectorAll(".page, .admin-page").forEach(p => {

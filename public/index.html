@@ -383,6 +383,7 @@
       </div>
       <!-- Email -->
       <div style="font-size:11px;color:rgba(255,255,255,0.25);">panilloconfart@gmail.com</div>
+      <a href="#" onclick="openPrivacyModal();return false;" style="font-size:11px;color:rgba(255,255,255,0.4);text-decoration:underline;">Política de Privacidade</a>
     </div>
   </footer>
 </div>
@@ -523,6 +524,10 @@
             <label class="fl">Alergia ou observação</label>
             <input class="fi" id="f-obs" type="text" placeholder="Ex: sem nozes, embalagem para presente...">
           </div>
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:var(--text-mid);margin-top:4px;">
+            <input type="checkbox" id="f-consent" style="margin-top:2px;accent-color:var(--teal-dark);">
+            <span>Autorizo o uso dos meus dados para processar este pedido, conforme a <a href="#" onclick="openPrivacyModal();return false;" style="color:var(--teal-dark);text-decoration:underline;">Política de Privacidade</a>.</span>
+          </label>
         </div>
         <div id="order-summary-1" class="order-summary"></div>
       </div>
@@ -2291,6 +2296,10 @@
           <label class="fl">Alergia ou observação</label>
           <input class="fi" id="crb-obs" type="text" placeholder="Ex: sem nozes, sem glúten...">
         </div>
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:var(--text-mid);margin-top:12px;">
+          <input type="checkbox" id="crb-consent" style="margin-top:2px;accent-color:var(--teal-dark);">
+          <span>Autorizo o uso dos meus dados conforme a <a href="#" onclick="openPrivacyModal();return false;" style="color:var(--teal-dark);text-decoration:underline;">Política de Privacidade</a>.</span>
+        </label>
         <div id="crb-error" style="display:none;margin-top:12px;background:#FAECE7;border-radius:8px;padding:10px 14px;font-size:12px;color:#993C1D;"></div>
       </div>
       <div class="crb-footer">
@@ -2537,6 +2546,31 @@
       </div>
       <div id="nc-error" style="display:none;color:#993C1D;font-size:12px;margin-bottom:12px;"></div>
       <button onclick="submitNewClient()" style="width:100%;background:var(--teal);color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Cadastrar cliente</button>
+    </div>
+  </div>
+</div>
+
+<!-- Política de Privacidade -->
+<div class="client-detail-overlay" id="privacy-modal">
+  <div class="client-detail-box" style="max-width:600px;">
+    <div class="client-detail-header">
+      <div style="flex:1;">
+        <div style="font-size:17px;font-weight:700;color:var(--teal-dark);">Política de Privacidade</div>
+        <div style="font-size:12px;color:var(--muted);">Panillo — Confeitaria Artesanal</div>
+      </div>
+      <button onclick="closePrivacyModal()" style="background:none;border:1.5px solid var(--border);padding:7px 12px;border-radius:8px;font-size:14px;cursor:pointer;color:var(--muted);">✕</button>
+    </div>
+    <div class="client-detail-body" style="font-size:13px;line-height:1.6;color:var(--text-mid);">
+      <p><strong>Quais dados coletamos</strong><br>
+      Nome, WhatsApp, e-mail, data de nascimento e observações (ex: alergias) que você mesma nos informa ao se cadastrar ou fazer um pedido. Também guardamos o histórico dos seus pedidos.</p>
+      <p><strong>Por que coletamos</strong><br>
+      Para processar seu pedido, entrar em contato sobre ele (confirmação, retirada, pagamento) e, quando você autoriza, para enviar mensagens como felicitação de aniversário. Não vendemos nem compartilhamos seus dados com terceiros para fins de marketing.</p>
+      <p><strong>Com quem compartilhamos</strong><br>
+      Usamos Firebase (Google) para armazenar os dados, e podemos usar CallMeBot, Resend ou notificações push apenas para avisar a nossa equipe sobre novos pedidos — essas ferramentas não têm acesso ao seu cadastro completo.</p>
+      <p><strong>Por quanto tempo guardamos</strong><br>
+      Seus dados de cadastro ficam guardados enquanto você for cliente ativa. Registros de pedidos (valores, itens) são mantidos por mais tempo por exigência fiscal/contábil, mesmo que seu cadastro seja excluído.</p>
+      <p><strong>Seus direitos</strong><br>
+      Você pode pedir a qualquer momento para ver, corrigir ou excluir seus dados de cadastro. Para isso, entre em contato pelo WhatsApp ou pelo e-mail <strong>panilloconfart@gmail.com</strong>. Atendemos o pedido em até 15 dias.</p>
     </div>
   </div>
 </div>
