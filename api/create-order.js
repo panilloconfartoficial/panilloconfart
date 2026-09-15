@@ -29,6 +29,7 @@
 
 import { getAdminDb } from "./_firebaseAdmin.js";
 import { FieldValue } from "firebase-admin/firestore";
+import { checkRateLimit, getClientIp } from "./_rateLimit.js";
 
 class OrderError extends Error {
   constructor(message, couponInvalid = false) {
@@ -40,6 +41,20 @@ class OrderError extends Error {
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" });
+  }
+
+  // Rota pública (sem autenticação) — limita pedidos por IP pra impedir
+  // que um script encha o Firestore de pedidos falsos.
+  const ip = getClientIp(req);
+  try {
+    const rl = await checkRateLimit(`create-order:${ip}`, { limit: 8, windowMs: 10 * 60 * 1000 });
+    if (rl.limited) {
+      res.setHeader("Retry-After", String(rl.retryAfterSec));
+      return res.status(429).json({ error: "Muitos pedidos em pouco tempo. Aguarde alguns minutos e tente novamente." });
+    }
+  } catch (e) {
+    console.error("create-order: falha no rate limit", e.message);
+    // Não bloqueia o pedido por falha do próprio controle de limite.
   }
 
   const body = req.body || {};

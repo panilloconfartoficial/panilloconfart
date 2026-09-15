@@ -80,5 +80,12 @@ service cloud.firestore {
     match /producaoLog/{id} {
       allow read, write: if request.auth != null;
     }
+    match /rateLimits/{id} {
+      // Contadores internos do rate limit das rotas públicas (ver
+      // api/_rateLimit.js) — só o Admin SDK (server-side) toca aqui.
+      // Sem "allow" nenhum, já cai no deny-by-default do Firestore;
+      // deixado explícito só pra documentar a intenção.
+      allow read, write: if false;
+    }
   }
 }

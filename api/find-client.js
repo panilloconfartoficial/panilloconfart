@@ -12,10 +12,25 @@
 //        ou 400/500 { error }
 
 import { getAdminDb } from "./_firebaseAdmin.js";
+import { checkRateLimit, getClientIp } from "./_rateLimit.js";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Método não permitido" });
+  }
+
+  // Rota pública (sem autenticação) — limita consultas por IP pra impedir
+  // que alguém varra números de WhatsApp em sequência tentando descobrir
+  // quais têm cadastro (enumeração de dados pessoais).
+  const ip = getClientIp(req);
+  try {
+    const rl = await checkRateLimit(`find-client:${ip}`, { limit: 20, windowMs: 10 * 60 * 1000 });
+    if (rl.limited) {
+      res.setHeader("Retry-After", String(rl.retryAfterSec));
+      return res.status(429).json({ error: "Muitas tentativas. Aguarde alguns minutos e tente novamente." });
+    }
+  } catch (e) {
+    console.error("find-client: falha no rate limit", e.message);
   }
 
   const wppRaw = req.query.wpp;
