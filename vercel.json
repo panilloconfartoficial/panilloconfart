@@ -1,0 +1,23 @@
+{
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/admin",    "destination": "/index.html" },
+    { "source": "/admin/",   "destination": "/index.html" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)",     "destination": "/$1" }
+  ],
+  "headers": [
+    {
+      "source": "/firebase-messaging-sw.js",
+      "headers": [
+        { "key": "Service-Worker-Allowed", "value": "/" },
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    }
+  ],
+  "functions": {
+    "api/gemini.js": {
+      "maxDuration": 30
+    }
+  }
+}

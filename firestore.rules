@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /orders/{id} {
+      // Pedidos públicos são criados via /api/create-order (Admin SDK,
+      // ignora estas regras) para garantir preço/desconto recalculados no
+      // servidor. Escrita direta pelo client só é permitida autenticada
+      // (usada pelo admin no fluxo de Venda Presencial).
+      allow create: if request.auth != null;
+      allow read, update: if request.auth != null;
+    }
+    match /products/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /clients/{id} {
+      // Cadastro público (sem auth): documento indexado pelo WhatsApp
+      // normalizado, com campos limitados e validados para impedir que o
+      // cliente escreva dados arbitrários no doc de outra pessoa.
+      //
+      // Contadores (pedidos/totalGasto/favorito/lastOrderAt) NÃO estão na
+      // lista de chaves permitidas aqui de propósito: só podem ser
+      // gravados pelo servidor (api/create-order.js, via Admin SDK, que
+      // ignora estas regras) ou pelo admin autenticado (regra abaixo).
+      // Sem essa restrição, qualquer pessoa poderia forjar totalGasto/
+      // pedidos de qualquer cliente direto pelo devtools, sem nem fazer
+      // um pedido real.
+      allow create, update: if request.auth == null
+        && request.resource.data.wpp == id
+        && request.resource.data.wpp.matches('^[0-9]{8,15}$')
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() > 0
+        && request.resource.data.nome.size() <= 120
+        && (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 200))
+        && (!('bday'  in request.resource.data) || request.resource.data.bday is string)
+        && (!('obs'   in request.resource.data) || (request.resource.data.obs is string && request.resource.data.obs.size() <= 500))
+        && request.resource.data.keys().hasOnly(['nome', 'wpp', 'email', 'bday', 'obs', 'lastCadastroAt']);
+      allow read, write: if request.auth != null;
+    }
+    match /stock/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /fiadoAccounts/{id} {
+      allow read, write: if request.auth != null;
+    }
+    match /ingredients/{id} {
+      allow read, write: if request.auth != null;
+    }
+    match /fcmTokens/{id} {
+      allow read, write: if request.auth != null;
+    }
+    match /appConfig/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /depoimentos/{id} {
+      // Avaliação pública: campos e tamanhos validados para evitar spam e
+      // payloads arbitrários; oculto/resposta só podem ser definidos pelo
+      // admin (update autenticado), nunca na criação.
+      allow create: if request.resource.data.clienteNome is string
+        && request.resource.data.clienteNome.size() <= 120
+        && request.resource.data.texto is string
+        && request.resource.data.texto.size() > 0
+        && request.resource.data.texto.size() <= 1000
+        && request.resource.data.estrelas is int
+        && request.resource.data.estrelas >= 1
+        && request.resource.data.estrelas <= 5
+        && request.resource.data.oculto == false
+        && request.resource.data.resposta == ""
+        && request.resource.data.keys().hasOnly([
+          'clienteNome', 'clienteWpp', 'estrelas', 'texto', 'oculto', 'resposta', 'createdAt'
+        ]);
+      allow read: if true;
+      allow update: if request.auth != null;
+    }
+    match /metas/{id} {
+      allow read, write: if request.auth != null;
+    }
+    match /producaoLog/{id} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
