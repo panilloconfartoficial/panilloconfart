@@ -15,10 +15,25 @@ export function getClientIp(req) {
   return req.socket?.remoteAddress || "unknown";
 }
 
+// Decisão pura, sem I/O — separada só pra poder ser testada isoladamente.
+// `data` é o estado salvo no Firestore (ou null se não existir ainda).
+// Retorna { limited: true, retryAfterSec } ou { limited: false, nextState }.
+export function computeRateLimitDecision(data, now, { limit, windowMs }) {
+  // Sem registro ainda, ou janela de tempo anterior já expirou: reinicia.
+  if (!data || now - data.windowStart > windowMs) {
+    return { limited: false, nextState: { windowStart: now, count: 1 } };
+  }
+  if (data.count >= limit) {
+    const retryAfterSec = Math.ceil((windowMs - (now - data.windowStart)) / 1000);
+    return { limited: true, retryAfterSec };
+  }
+  return { limited: false, nextState: { windowStart: data.windowStart, count: data.count + 1 } };
+}
+
 // Retorna { limited: true/false, retryAfterSec? }.
 // `key` deve identificar a rota + IP (ex: "create-order:1.2.3.4") pra não
 // misturar o limite de rotas diferentes.
-export async function checkRateLimit(key, { limit, windowMs }) {
+export async function checkRateLimit(key, opts) {
   const db = getAdminDb();
   const ref = db.collection("rateLimits").doc(key);
   const now = Date.now();
@@ -26,19 +41,12 @@ export async function checkRateLimit(key, { limit, windowMs }) {
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.exists ? snap.data() : null;
+    const decision = computeRateLimitDecision(data, now, opts);
 
-    // Sem registro ainda, ou janela de tempo anterior já expirou: reinicia.
-    if (!data || now - data.windowStart > windowMs) {
-      tx.set(ref, { windowStart: now, count: 1 });
-      return { limited: false };
+    if (decision.limited) {
+      return { limited: true, retryAfterSec: decision.retryAfterSec };
     }
-
-    if (data.count >= limit) {
-      const retryAfterSec = Math.ceil((windowMs - (now - data.windowStart)) / 1000);
-      return { limited: true, retryAfterSec };
-    }
-
-    tx.update(ref, { count: data.count + 1 });
+    tx.set(ref, decision.nextState);
     return { limited: false };
   });
 }

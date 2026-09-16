@@ -30,13 +30,7 @@
 import { getAdminDb } from "./_firebaseAdmin.js";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkRateLimit, getClientIp } from "./_rateLimit.js";
-
-class OrderError extends Error {
-  constructor(message, couponInvalid = false) {
-    super(message);
-    this.couponInvalid = couponInvalid;
-  }
-}
+import { OrderError, normalizeWpp, computeItemsAndSubtotal, validateCoupon, computeTotal } from "./_orderCalc.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -80,7 +74,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Forma de pagamento inválida" });
   }
 
-  const wppNorm = String(cliente.wpp).replace(/\D/g, "");
+  const wppNorm = normalizeWpp(cliente.wpp);
   if (wppNorm.length < 8) {
     return res.status(400).json({ error: "WhatsApp do cliente inválido" });
   }
@@ -93,30 +87,12 @@ export default async function handler(req, res) {
       items.map(i => db.collection("products").doc(String(i.prodId)).get())
     );
 
-    const itensFinal = [];
-    let subtotal = 0;
-    for (let idx = 0; idx < items.length; idx++) {
-      const reqItem = items[idx];
-      const snap = prodSnaps[idx];
-      if (!snap.exists) {
-        return res.status(400).json({ error: `Produto não encontrado: ${reqItem.prodId}` });
-      }
-      const prod = snap.data();
-      if (prod.ativo === false) {
-        return res.status(400).json({ error: `Produto indisponível: ${prod.nome || reqItem.prodId}` });
-      }
-      const qty = Number(reqItem.qty);
-      const preco = Number(prod.preco || 0);
-      subtotal += preco * qty;
-      itensFinal.push({
-        prodId: snap.id,
-        nome: prod.nome || "",
-        qty,
-        preco,
-        sabores: reqItem.sabores || null,
-        obs: reqItem.obs || null,
-      });
+    const resolvedProducts = prodSnaps.map(snap => snap.exists ? { ...snap.data(), id: snap.id } : null);
+    const calc = computeItemsAndSubtotal(items, resolvedProducts);
+    if (calc.error) {
+      return res.status(400).json({ error: calc.error });
     }
+    const { itensFinal, subtotal } = calc;
 
     // ─── 2) Busca conta fiado do cliente (se pagamento === "fiado") ─
     // clientWpp pode estar salvo formatado ou normalizado em registros
@@ -152,7 +128,6 @@ export default async function handler(req, res) {
       let cupomIndex = -1;
 
       if (cupomCode) {
-        const code = String(cupomCode).trim().toUpperCase();
         const appConfigSnap = await appConfigCol.limit(1).get();
         if (appConfigSnap.empty) {
           throw new OrderError("Cupom inválido", true);
@@ -160,14 +135,10 @@ export default async function handler(req, res) {
         appConfigRef = appConfigSnap.docs[0].ref;
         const appConfigTx = await tx.get(appConfigRef);
         appConfigData = appConfigTx.data() || {};
-        const coupons = appConfigData.coupons || [];
-        cupomIndex = coupons.findIndex(c => c.code === code);
-        if (cupomIndex < 0) throw new OrderError("Cupom inválido", true);
-
-        const c = coupons[cupomIndex];
         const today = new Date().toISOString().split("T")[0];
-        if (c.validade && c.validade < today) throw new OrderError("Cupom expirado", true);
-        if (c.maxUsos && (c.usos || 0) >= c.maxUsos) throw new OrderError("Cupom atingiu o limite de usos", true);
+        const cv = validateCoupon(appConfigData.coupons || [], cupomCode, today);
+        if (cv.error) throw new OrderError(cv.error, true);
+        cupomIndex = cv.index;
       }
 
       let fiadoData = null;
@@ -185,7 +156,7 @@ export default async function handler(req, res) {
         cupomUsado = String(cupomCode).trim().toUpperCase();
       }
 
-      const total = subtotal * (1 - (descontoAplicado || 0) / 100);
+      const total = computeTotal(subtotal, descontoAplicado);
 
       const order = {
         numero: orderNum,

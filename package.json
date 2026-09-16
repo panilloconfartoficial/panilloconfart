@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=18"
   },
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "firebase-admin": "^14.0.0"
   }
